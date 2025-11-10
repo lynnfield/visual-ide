@@ -76,3 +76,11 @@ well.
 Ok, after fixing couple of bugs I was able to add the first ActionDefinition by click.
 The next step is to make the name editable and to add a way to add new functions to the body of
 ActionDefinition.
+
+Decided to get rid of input and output types, because I'm not don't anything with them right now.
+Also I'll add an id to action, so each ActionDefinition will be able to have a persistent id, while
+having a mutable name.
+I've added name editing. It is awful now: editing view have internal paddings what makes text
+cropped, the font color is grey and look weird, no value checks so you could save an empty value or
+the same value as exists, and no save-on-focus-loss. But I'll address it in the future maybe.
+Next I need to make it possible to add new functions into an ActionDefinition body.

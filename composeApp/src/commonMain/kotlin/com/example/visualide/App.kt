@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package com.example.visualide
 
 import androidx.compose.foundation.ScrollState
@@ -16,6 +18,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
@@ -34,8 +37,10 @@ import org.jetbrains.compose.ui.tooling.preview.Preview
 import kotlin.math.max
 import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
+import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
-// Define the color palette
+//region color palette
 private val DarkNeonColorScheme = darkColorScheme(
     background = Color(0xFF010203),      // Near-black background
     surface = Color(0xFF0A0A14),        // Slightly lighter surface for cards/dialogs
@@ -57,6 +62,7 @@ private val LightNeonColorScheme = lightColorScheme(
     tertiary = Color(0xFF00BFFF)         // Sky Blue for accents
     // You can customize other colors like error, etc.
 )
+//endregion
 
 //region data model
 sealed class ActionLayout {
@@ -67,14 +73,14 @@ sealed class ActionLayout {
 }
 
 data class ActionDefinition(
-    val name: String,
-    val input: String?,
-    val output: String?,
+    val name: MutableState<String>,
     val body: ActionLayout,
+    val id: Uuid = Uuid.random(),
 )
 //endregion
 
 //region blocks width calculations
+@Suppress("UnusedReceiverParameter")
 val ActionLayout.Action.width: Int
     get() = 3
 val ActionLayout.Sequential.width: Int
@@ -182,11 +188,11 @@ fun ActionDefinition.render(): RenderTable = buildList {
     add(
         listOf(
             {
-                Text(
-                    name,
-                    modifier = Modifier.size(width * step, step)
-                        .border(Dp.Hairline, MaterialTheme.colorScheme.primary),
-                    textAlign = TextAlign.Center
+                TextWithEditor(
+                    state = name,
+                    modifier = Modifier
+                        .size(width * step, step)
+                        .border(Dp.Hairline, MaterialTheme.colorScheme.primary)
                 )
             }
         )
@@ -230,10 +236,10 @@ fun App() {
 //        )
 //    ).associateBy { it.name }
 
-    val actions = remember { mutableStateMapOf<String, ActionDefinition>() }
-    var currentActionName by remember(actions) { mutableStateOf(actions.keys.firstOrNull()) }
+    val actions = remember { mutableStateMapOf<Uuid, ActionDefinition>() }
+    var currentActionId by remember(actions) { mutableStateOf(actions.keys.firstOrNull()) }
     val toRender =
-        remember(actions, currentActionName) { currentActionName?.let { actions[it] }?.render() }
+        remember(actions, currentActionId) { currentActionId?.let { actions[it] }?.render() }
 
     MaterialTheme(colorScheme = colors) {
         Box(Modifier.fillMaxSize()) {
@@ -245,14 +251,12 @@ fun App() {
                 if (toRender.isNullOrEmpty()) {
                     Button(
                         onClick = {
-                            actions["New action"] = ActionDefinition(
-                                "New action",
-                                null,
-                                null,
+                            val action = ActionDefinition(
+                                mutableStateOf("New action"),
                                 ActionLayout.Sequential(listOf())
                             )
-
-                            currentActionName = "New action"
+                            actions[action.id] = action
+                            currentActionId = action.id
                         }
                     ) {
                         Text("Nothing to show. Click to add an action.")
