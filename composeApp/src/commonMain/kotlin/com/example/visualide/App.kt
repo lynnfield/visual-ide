@@ -10,11 +10,17 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
+import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -22,9 +28,12 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.times
+import androidx.compose.ui.util.fastFold
+import androidx.compose.ui.util.fastMap
 import org.jetbrains.compose.ui.tooling.preview.Preview
-import kotlin.collections.map
 import kotlin.math.max
+import kotlin.time.Clock
+import kotlin.time.ExperimentalTime
 
 // Define the color palette
 private val DarkNeonColorScheme = darkColorScheme(
@@ -107,13 +116,12 @@ fun ActionLayout.Action.render(): RenderTable = listOf(
 )
 
 fun ActionLayout.Sequential.render(): RenderTable =
-    body
-        .map { it.render() }
-        .reduce { acc, list ->
-            List(max(acc.size, list.size)) {
-                acc.getOrElse(it) { listOf() } + list.getOrElse(it) { listOf() }
-            }
+    body.fastFold(listOf()) { acc, list ->
+        val rendered = list.render()
+        List(max(acc.size, rendered.size)) {
+            acc.getOrElse(it) { listOf() } + rendered.getOrElse(it) { listOf() }
         }
+    }
 
 fun ActionLayout.RepeatUntilActive.render(): RenderTable = buildList {
     add(
@@ -129,7 +137,7 @@ fun ActionLayout.RepeatUntilActive.render(): RenderTable = buildList {
         )
     )
     addAll(
-        body.render().map {
+        body.render().fastMap {
             buildList {
                 add(stepSpacer)
                 addAll(it)
@@ -153,7 +161,7 @@ fun ActionLayout.RetryUntilResult.render(): RenderTable = buildList {
         )
     )
     addAll(
-        body.render().map {
+        body.render().fastMap {
             buildList {
                 add(stepSpacer)
                 addAll(it)
@@ -184,7 +192,7 @@ fun ActionDefinition.render(): RenderTable = buildList {
         )
     )
     addAll(
-        body.render().map {
+        body.render().fastMap {
             buildList {
                 add(stepSpacer)
                 addAll(it)
@@ -195,45 +203,64 @@ fun ActionDefinition.render(): RenderTable = buildList {
 }
 //endregion
 
+@OptIn(ExperimentalTime::class)
 @Composable
 @Preview
 fun App() {
+    println(Clock.System.now().toString())
     val useDarkTheme = isSystemInDarkTheme()
     val colors = if (useDarkTheme) DarkNeonColorScheme else LightNeonColorScheme
 
-    val actions = listOf(
-        ActionDefinition(
-            "EntryPoint",
-            null,
-            null,
-            ActionLayout.RetryUntilResult(
-                ActionLayout.RepeatUntilActive(
-                    ActionLayout.Sequential(
-                        listOf(
-                            ActionLayout.Action("login"),
-                            ActionLayout.Action("process anonymous state"),
-                            ActionLayout.Action("process authorised state"),
-                        )
-                    )
-                )
-            )
-        )
-    ).associateBy { it.name }
-    val currentActionName = "EntryPoint"
-    val currentAction = actions[currentActionName]!!
-    val toRender = currentAction.render()
+//    val actions = listOf(
+//        ActionDefinition(
+//            "EntryPoint",
+//            null,
+//            null,
+//            ActionLayout.RetryUntilResult(
+//                ActionLayout.RepeatUntilActive(
+//                    ActionLayout.Sequential(
+//                        listOf(
+//                            ActionLayout.Action("login"),
+//                            ActionLayout.Action("process anonymous state"),
+//                            ActionLayout.Action("process authorised state"),
+//                        )
+//                    )
+//                )
+//            )
+//        )
+//    ).associateBy { it.name }
+
+    val actions = remember { mutableStateMapOf<String, ActionDefinition>() }
+    var currentActionName by remember(actions) { mutableStateOf(actions.keys.firstOrNull()) }
+    val toRender =
+        remember(actions, currentActionName) { currentActionName?.let { actions[it] }?.render() }
 
     MaterialTheme(colorScheme = colors) {
         Box(Modifier.fillMaxSize()) {
             Column(
                 Modifier
                     .align(Alignment.Center)
-                    .size(700.dp) // todo use sizeIn
-                    .border(1.dp, MaterialTheme.colorScheme.primary)
                     .horizontalScroll(ScrollState(0))
             ) {
-                toRender.forEach { row ->
-                    Row { row.forEach { it() } }
+                if (toRender.isNullOrEmpty()) {
+                    Button(
+                        onClick = {
+                            actions["New action"] = ActionDefinition(
+                                "New action",
+                                null,
+                                null,
+                                ActionLayout.Sequential(listOf())
+                            )
+
+                            currentActionName = "New action"
+                        }
+                    ) {
+                        Text("Nothing to show. Click to add an action.")
+                    }
+                } else {
+                    toRender.forEach { row ->
+                        Row { row.forEach { it() } }
+                    }
                 }
             }
         }

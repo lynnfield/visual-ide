@@ -68,3 +68,11 @@ basically just more complex input forms.
 I've added horizontal scroll. It is working. I don't like light theme though.
 Next: focus on editability (how to add new elements), expandability (how to expand actions) and fix
 those spaces.
+
+First step on editability - tap-to-add. When there's nothing on the screen click should add a new
+ActionDefinition.
+I made everything mutable and realized that probably ActionDefinition fields should be states as
+well.
+Ok, after fixing couple of bugs I was able to add the first ActionDefinition by click.
+The next step is to make the name editable and to add a way to add new functions to the body of
+ActionDefinition.
