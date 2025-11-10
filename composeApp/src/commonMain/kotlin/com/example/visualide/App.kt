@@ -1,47 +1,239 @@
 package com.example.visualide
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
+import androidx.compose.foundation.ScrollState
+import androidx.compose.foundation.border
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.safeContentPadding
-import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.runtime.*
+import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.lightColorScheme
+import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import org.jetbrains.compose.resources.painterResource
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.times
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import kotlin.collections.map
+import kotlin.math.max
 
-import visualide.composeapp.generated.resources.Res
-import visualide.composeapp.generated.resources.compose_multiplatform
+// Define the color palette
+private val DarkNeonColorScheme = darkColorScheme(
+    background = Color(0xFF010203),      // Near-black background
+    surface = Color(0xFF0A0A14),        // Slightly lighter surface for cards/dialogs
+    onBackground = Color(0xFFE0E0E0),   // Light gray text on background
+    onSurface = Color(0xFFE0E0E0),      // Light gray text on surface
+    primary = Color(0xFF00FFFF),        // Electric Blue/Cyan for primary elements
+    secondary = Color(0xFFFF00FF),      // Magenta for secondary elements
+    tertiary = Color(0xFF6A00FF)         // Purple for accents
+    // You can customize other colors like error, etc.
+)
+
+private val LightNeonColorScheme = lightColorScheme(
+    background = Color(0xFFFFFFFF),      // White background
+    surface = Color(0xFFF5F5FA),        // Light gray surface for cards/dialogs
+    onBackground = Color(0xFF212121),   // Charcoal text on background
+    onSurface = Color(0xFF212121),      // Charcoal text on surface
+    primary = Color(0xFF39FF14),        // Lime Green for primary elements
+    secondary = Color(0xFFFFAC1C),      // Intense Orange for secondary elements
+    tertiary = Color(0xFF00BFFF)         // Sky Blue for accents
+    // You can customize other colors like error, etc.
+)
+
+//region data model
+sealed class ActionLayout {
+    data class RepeatUntilActive(val body: ActionLayout) : ActionLayout()
+    data class RetryUntilResult(val body: ActionLayout) : ActionLayout()
+    data class Sequential(val body: List<ActionLayout>) : ActionLayout()
+    data class Action(val name: String) : ActionLayout()
+}
+
+data class ActionDefinition(
+    val name: String,
+    val input: String?,
+    val output: String?,
+    val body: ActionLayout,
+)
+//endregion
+
+//region blocks width calculations
+val ActionLayout.Action.width: Int
+    get() = 3
+val ActionLayout.Sequential.width: Int
+    get() = body.sumOf { 1 + it.width + 1 }
+val ActionLayout.RepeatUntilActive.width: Int
+    get() = 1 + body.width + 1
+val ActionLayout.RetryUntilResult.width: Int
+    get() = 1 + body.width + 1
+val ActionLayout.width: Int
+    get() = when (this) {
+        is ActionLayout.Action -> width
+        is ActionLayout.RepeatUntilActive -> width
+        is ActionLayout.RetryUntilResult -> width
+        is ActionLayout.Sequential -> width
+    }
+val ActionDefinition.width: Int
+    get() = 1 + body.width + 1
+//endregion
+
+//region render
+val step = 48.dp
+
+val stepSpacer: @Composable () -> Unit = { Spacer(Modifier.size(step)) }
+
+typealias RenderTable = List<List<@Composable () -> Unit>>
+
+fun ActionLayout.Action.render(): RenderTable = listOf(
+    listOf(
+        {
+            Text(
+                name,
+                modifier = Modifier
+                    .size(width * step, step)
+                    .border(Dp.Hairline, MaterialTheme.colorScheme.primary),
+                textAlign = TextAlign.Center,
+            )
+        }
+    )
+)
+
+fun ActionLayout.Sequential.render(): RenderTable =
+    body
+        .map { it.render() }
+        .reduce { acc, list ->
+            List(max(acc.size, list.size)) {
+                acc.getOrElse(it) { listOf() } + list.getOrElse(it) { listOf() }
+            }
+        }
+
+fun ActionLayout.RepeatUntilActive.render(): RenderTable = buildList {
+    add(
+        listOf(
+            {
+                Text(
+                    "repeat until active",
+                    modifier = Modifier.size(width * step, step)
+                        .border(Dp.Hairline, MaterialTheme.colorScheme.primary),
+                    textAlign = TextAlign.Center
+                )
+            }
+        )
+    )
+    addAll(
+        body.render().map {
+            buildList {
+                add(stepSpacer)
+                addAll(it)
+                add(stepSpacer)
+            }
+        }
+    )
+}
+
+fun ActionLayout.RetryUntilResult.render(): RenderTable = buildList {
+    add(
+        listOf(
+            {
+                Text(
+                    "retry until result",
+                    modifier = Modifier.size(width * step, step)
+                        .border(Dp.Hairline, MaterialTheme.colorScheme.primary),
+                    textAlign = TextAlign.Center
+                )
+            }
+        )
+    )
+    addAll(
+        body.render().map {
+            buildList {
+                add(stepSpacer)
+                addAll(it)
+                add(stepSpacer)
+            }
+        }
+    )
+}
+
+fun ActionLayout.render(): RenderTable = when (this) {
+    is ActionLayout.Action -> render()
+    is ActionLayout.RepeatUntilActive -> render()
+    is ActionLayout.RetryUntilResult -> render()
+    is ActionLayout.Sequential -> render()
+}
+
+fun ActionDefinition.render(): RenderTable = buildList {
+    add(
+        listOf(
+            {
+                Text(
+                    name,
+                    modifier = Modifier.size(width * step, step)
+                        .border(Dp.Hairline, MaterialTheme.colorScheme.primary),
+                    textAlign = TextAlign.Center
+                )
+            }
+        )
+    )
+    addAll(
+        body.render().map {
+            buildList {
+                add(stepSpacer)
+                addAll(it)
+                add(stepSpacer)
+            }
+        }
+    )
+}
+//endregion
 
 @Composable
 @Preview
 fun App() {
-    MaterialTheme {
-        var showContent by remember { mutableStateOf(false) }
-        Column(
-            modifier = Modifier
-                .background(MaterialTheme.colorScheme.primaryContainer)
-                .safeContentPadding()
-                .fillMaxSize(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-            Button(onClick = { showContent = !showContent }) {
-                Text("Click me!")
-            }
-            AnimatedVisibility(showContent) {
-                val greeting = remember { Greeting().greet() }
-                Column(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    Image(painterResource(Res.drawable.compose_multiplatform), null)
-                    Text("Compose: $greeting")
+    val useDarkTheme = isSystemInDarkTheme()
+    val colors = if (useDarkTheme) DarkNeonColorScheme else LightNeonColorScheme
+
+    val actions = listOf(
+        ActionDefinition(
+            "EntryPoint",
+            null,
+            null,
+            ActionLayout.RetryUntilResult(
+                ActionLayout.RepeatUntilActive(
+                    ActionLayout.Sequential(
+                        listOf(
+                            ActionLayout.Action("login"),
+                            ActionLayout.Action("process anonymous state"),
+                            ActionLayout.Action("process authorised state"),
+                        )
+                    )
+                )
+            )
+        )
+    ).associateBy { it.name }
+    val currentActionName = "EntryPoint"
+    val currentAction = actions[currentActionName]!!
+    val toRender = currentAction.render()
+
+    MaterialTheme(colorScheme = colors) {
+        Box(Modifier.fillMaxSize()) {
+            Column(
+                Modifier
+                    .align(Alignment.Center)
+                    .size(700.dp) // todo use sizeIn
+                    .border(1.dp, MaterialTheme.colorScheme.primary)
+                    .horizontalScroll(ScrollState(0))
+            ) {
+                toRender.forEach { row ->
+                    Row { row.forEach { it() } }
                 }
             }
         }
