@@ -84,3 +84,16 @@ I've added name editing. It is awful now: editing view have internal paddings wh
 cropped, the font color is grey and look weird, no value checks so you could save an empty value or
 the same value as exists, and no save-on-focus-loss. But I'll address it in the future maybe.
 Next I need to make it possible to add new functions into an ActionDefinition body.
+
+First of all: the body should be mutable and nullable. This will allow me to not deciding on what
+should be there in the beginning and edit it in the future. I'll also fix the error with new
+nullable type for ActionDefinition.width: let it be one by default.
+I'm stuck: I was "rendering" ActionDefinition hierarchy into a kind of a grid or table that I easily
+can draw later, but now, when ActionDefinition.body became a MutableState I realised that I have to
+listen to the item in order to redraw it when something changed. This is painful.
+I'm thinking if it is possible to traverse through a tree and emit a sequence of "rows". It is
+called breadth-first traversal as far as I remember. However, width calculation should be DFS.
+Ok, I failed for today. It feels like the solution is near, but I'm tired and cannot proceed. I also
+worried that having mutable states without remember() will not have any reasonable effect. Anyway,
+the first step is to convert the RenderTable into a sequence of lists using BFS for traversing on
+demand.

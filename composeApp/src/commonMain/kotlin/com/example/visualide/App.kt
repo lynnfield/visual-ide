@@ -74,7 +74,7 @@ sealed class ActionLayout {
 
 data class ActionDefinition(
     val name: MutableState<String>,
-    val body: ActionLayout,
+    val body: MutableState<ActionLayout?> = mutableStateOf(null),
     val id: Uuid = Uuid.random(),
 )
 //endregion
@@ -97,7 +97,7 @@ val ActionLayout.width: Int
         is ActionLayout.Sequential -> width
     }
 val ActionDefinition.width: Int
-    get() = 1 + body.width + 1
+    get() = 1 + (body.value?.width ?: 1) + 1
 //endregion
 
 //region render
@@ -252,8 +252,7 @@ fun App() {
                     Button(
                         onClick = {
                             val action = ActionDefinition(
-                                mutableStateOf("New action"),
-                                ActionLayout.Sequential(listOf())
+                                name = mutableStateOf("New action")
                             )
                             actions[action.id] = action
                             currentActionId = action.id
