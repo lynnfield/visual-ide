@@ -8,12 +8,19 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
@@ -31,11 +38,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.times
-import androidx.compose.ui.util.fastFold
-import androidx.compose.ui.util.fastMap
 import org.jetbrains.compose.ui.tooling.preview.Preview
-import kotlin.math.max
-import kotlin.time.Clock
 import kotlin.time.ExperimentalTime
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -103,109 +106,81 @@ val ActionDefinition.width: Int
 //region render
 val step = 48.dp
 
-val stepSpacer: @Composable () -> Unit = { Spacer(Modifier.size(step)) }
-
-typealias RenderTable = List<List<@Composable () -> Unit>>
-
-fun ActionLayout.Action.render(): RenderTable = listOf(
-    listOf(
-        {
-            Text(
-                name,
-                modifier = Modifier
-                    .size(width * step, step)
-                    .border(Dp.Hairline, MaterialTheme.colorScheme.primary),
-                textAlign = TextAlign.Center,
-            )
-        }
+@Composable
+fun ActionLayout.Action.render(modifier: Modifier = Modifier) {
+    Text(
+        name,
+        modifier = modifier
+            .size(3 * step, step)
+            .border(Dp.Hairline, MaterialTheme.colorScheme.primary),
+        textAlign = TextAlign.Center,
     )
-)
+}
 
-fun ActionLayout.Sequential.render(): RenderTable =
-    body.fastFold(listOf()) { acc, list ->
-        val rendered = list.render()
-        List(max(acc.size, rendered.size)) {
-            acc.getOrElse(it) { listOf() } + rendered.getOrElse(it) { listOf() }
+@Composable
+fun ActionLayout.Sequential.render(modifier: Modifier = Modifier) {
+    Text("sequential", modifier = modifier)
+}
+
+@Composable
+fun ActionLayout.RepeatUntilActive.render(modifier: Modifier = Modifier) {
+    Text(
+        "repeat until active",
+        modifier = modifier.size(width * step, step)
+            .border(Dp.Hairline, MaterialTheme.colorScheme.primary),
+        textAlign = TextAlign.Center
+    )
+}
+
+@Composable
+fun ActionLayout.RetryUntilResult.render(modifier: Modifier = Modifier) {
+    Text(
+        "retry until result",
+        modifier = Modifier.size(width * step, step)
+            .border(Dp.Hairline, MaterialTheme.colorScheme.primary),
+        textAlign = TextAlign.Center
+    )
+}
+
+@Composable
+fun ActionLayout.render(modifier: Modifier = Modifier) = when (this) {
+    is ActionLayout.Action -> render(modifier)
+    is ActionLayout.RepeatUntilActive -> render(modifier)
+    is ActionLayout.RetryUntilResult -> render(modifier)
+    is ActionLayout.Sequential -> render(modifier)
+}
+
+@Composable
+fun ActionDefinition.render(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.width(IntrinsicSize.Max),
+    ) {
+        TextWithEditor(
+            state = name,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(step)
+                .border(Dp.Hairline, MaterialTheme.colorScheme.primary)
+        )
+        body.value?.render(Modifier.padding(horizontal = step)) ?: run {
+            var showMenu by remember { mutableStateOf(false) }
+            Button(
+                modifier = Modifier.padding(horizontal = step),
+                onClick = { showMenu = !showMenu }
+            ) {
+                Text("Body is empty. Click to add")
+            }
+            DropdownMenu(
+                expanded = showMenu,
+                onDismissRequest = { showMenu = false },
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Repeat until active") },
+                    onClick = { println("add repeat until active") }
+                )
+            }
         }
     }
-
-fun ActionLayout.RepeatUntilActive.render(): RenderTable = buildList {
-    add(
-        listOf(
-            {
-                Text(
-                    "repeat until active",
-                    modifier = Modifier.size(width * step, step)
-                        .border(Dp.Hairline, MaterialTheme.colorScheme.primary),
-                    textAlign = TextAlign.Center
-                )
-            }
-        )
-    )
-    addAll(
-        body.render().fastMap {
-            buildList {
-                add(stepSpacer)
-                addAll(it)
-                add(stepSpacer)
-            }
-        }
-    )
-}
-
-fun ActionLayout.RetryUntilResult.render(): RenderTable = buildList {
-    add(
-        listOf(
-            {
-                Text(
-                    "retry until result",
-                    modifier = Modifier.size(width * step, step)
-                        .border(Dp.Hairline, MaterialTheme.colorScheme.primary),
-                    textAlign = TextAlign.Center
-                )
-            }
-        )
-    )
-    addAll(
-        body.render().fastMap {
-            buildList {
-                add(stepSpacer)
-                addAll(it)
-                add(stepSpacer)
-            }
-        }
-    )
-}
-
-fun ActionLayout.render(): RenderTable = when (this) {
-    is ActionLayout.Action -> render()
-    is ActionLayout.RepeatUntilActive -> render()
-    is ActionLayout.RetryUntilResult -> render()
-    is ActionLayout.Sequential -> render()
-}
-
-fun ActionDefinition.render(): RenderTable = buildList {
-    add(
-        listOf(
-            {
-                TextWithEditor(
-                    state = name,
-                    modifier = Modifier
-                        .size(width * step, step)
-                        .border(Dp.Hairline, MaterialTheme.colorScheme.primary)
-                )
-            }
-        )
-    )
-    addAll(
-        body.render().fastMap {
-            buildList {
-                add(stepSpacer)
-                addAll(it)
-                add(stepSpacer)
-            }
-        }
-    )
 }
 //endregion
 
@@ -213,8 +188,8 @@ fun ActionDefinition.render(): RenderTable = buildList {
 @Composable
 @Preview
 fun App() {
-    println(Clock.System.now().toString())
     val useDarkTheme = isSystemInDarkTheme()
+    println(useDarkTheme)
     val colors = if (useDarkTheme) DarkNeonColorScheme else LightNeonColorScheme
 
 //    val actions = listOf(
@@ -238,32 +213,27 @@ fun App() {
 
     val actions = remember { mutableStateMapOf<Uuid, ActionDefinition>() }
     var currentActionId by remember(actions) { mutableStateOf(actions.keys.firstOrNull()) }
-    val toRender =
-        remember(actions, currentActionId) { currentActionId?.let { actions[it] }?.render() }
 
     MaterialTheme(colorScheme = colors) {
-        Box(Modifier.fillMaxSize()) {
-            Column(
-                Modifier
-                    .align(Alignment.Center)
-                    .horizontalScroll(ScrollState(0))
-            ) {
-                if (toRender.isNullOrEmpty()) {
-                    Button(
-                        onClick = {
-                            val action = ActionDefinition(
-                                name = mutableStateOf("New action")
-                            )
-                            actions[action.id] = action
-                            currentActionId = action.id
+        Scaffold {
+            Box(Modifier.fillMaxSize()) {
+                Column(
+                    Modifier
+                        .align(Alignment.Center)
+                        .horizontalScroll(ScrollState(0))
+                ) {
+                    currentActionId?.let { actions[it] }?.render(Modifier.wrapContentSize())
+                        ?: Button(
+                            onClick = {
+                                val action = ActionDefinition(
+                                    name = mutableStateOf("New action")
+                                )
+                                actions[action.id] = action
+                                currentActionId = action.id
+                            }
+                        ) {
+                            Text("Nothing to show. Click to add an action.")
                         }
-                    ) {
-                        Text("Nothing to show. Click to add an action.")
-                    }
-                } else {
-                    toRender.forEach { row ->
-                        Row { row.forEach { it() } }
-                    }
                 }
             }
         }

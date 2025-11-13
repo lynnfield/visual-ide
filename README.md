@@ -97,3 +97,14 @@ Ok, I failed for today. It feels like the solution is near, but I'm tired and ca
 worried that having mutable states without remember() will not have any reasonable effect. Anyway,
 the first step is to convert the RenderTable into a sequence of lists using BFS for traversing on
 demand.
+
+I have a thought: Compose is saying that it is optimised, so maybe I shouldn't really bother myself
+with all these conversion to a table or a sequence and I can just render the table? Yes, it'll be a
+repeated hierarchy of rows and columns, but I'll let Compose handle it.
+Will force-enable the dark theme, as the light one is burning my eyes.
+Oh wow, theme is ignored completely for some reason...
+Cool, I managed to add "addition" for ActionDefinition and a button in it's empty body to open a
+stub dropdown menu (which is in dark theme, btw). Next need to populate it with meaningful items and
+add "addition" logic for all the ActionLayouts types.
+I quickly googled the dark theme problem and it appears that I need to wrap everything into
+Scaffold. How weird...
