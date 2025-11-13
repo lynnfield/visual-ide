@@ -120,3 +120,11 @@ document on each commit. So it'll be possible to read only the thoughts related 
 rather than everything at once.
 Quick thought: need to add a way to delete Actions, save and load them.
 However, next step is Sequential.
+
+Sequential is just a row of items. But how to show that you can add something to it? Well, an "add"
+button obviously. Let's do it.
+Well it works, kind of. I faced weird bug: when I'm clicking the plus button and adding the second
+Action, the first one gets stretched and the second one is squished.
+Damn it! I'm using fillMaxWidth() for TextBlocks...
+Not sure what to do. Cannot just remove it. Also should prohibit addition of Sequential to
+Sequential. Will leave it for tomorrow.

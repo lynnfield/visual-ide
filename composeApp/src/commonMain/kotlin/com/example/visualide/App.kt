@@ -5,9 +5,11 @@ package com.example.visualide
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -21,10 +23,12 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -66,7 +70,8 @@ sealed class ActionLayout {
     data class RetryUntilResult(val body: MutableState<ActionLayout?> = mutableStateOf(null)) :
         ActionLayout()
 
-    data class Sequential(val body: List<ActionLayout> = emptyList()) : ActionLayout()
+    data class Sequential(val body: SnapshotStateList<ActionLayout> = mutableStateListOf()) :
+        ActionLayout()
     data class Action(val name: MutableState<String> = mutableStateOf("New Action")) :
         ActionLayout()
 }
@@ -88,14 +93,21 @@ fun ActionLayout.Action.Render(modifier: Modifier = Modifier) {
 
 @Composable
 fun ActionLayout.Sequential.Render(modifier: Modifier = Modifier) {
-    Text("sequential", modifier = modifier)
+    Row(
+        modifier = modifier.width(IntrinsicSize.Min),
+        horizontalArrangement = Arrangement.spacedBy(step),
+    ) {
+        body.forEach { it.Render() }
+        AddNewLayoutSelector("+") { body += it }
+    }
 }
 
 @Composable
 fun ActionLayout.RepeatWhileActive.Render(modifier: Modifier = Modifier) {
     Column(modifier = modifier.width(IntrinsicSize.Max)) {
         TextBlock("repeat while active")
-        body.value?.Render(Modifier.padding(horizontal = step)) ?: AddNewLayoutSelector(body)
+        body.value?.Render(Modifier.padding(horizontal = step))
+            ?: AddNewLayoutSelector(onAdd = body::value::set)
     }
 }
 
@@ -103,7 +115,8 @@ fun ActionLayout.RepeatWhileActive.Render(modifier: Modifier = Modifier) {
 fun ActionLayout.RetryUntilResult.Render(modifier: Modifier = Modifier) {
     Column(modifier = modifier.width(IntrinsicSize.Max)) {
         TextBlock("retry until result")
-        body.value?.Render(Modifier.padding(horizontal = step)) ?: AddNewLayoutSelector(body)
+        body.value?.Render(Modifier.padding(horizontal = step))
+            ?: AddNewLayoutSelector(onAdd = body::value::set)
     }
 }
 
@@ -119,7 +132,8 @@ fun ActionLayout.Render(modifier: Modifier = Modifier) = when (this) {
 fun ActionDefinition.Render(modifier: Modifier = Modifier) {
     Column(modifier = modifier.width(IntrinsicSize.Max)) {
         TextBlock(name)
-        body.value?.Render(Modifier.padding(horizontal = step)) ?: AddNewLayoutSelector(body)
+        body.value?.Render(Modifier.padding(horizontal = step))
+            ?: AddNewLayoutSelector(onAdd = body::value::set)
     }
 }
 //endregion

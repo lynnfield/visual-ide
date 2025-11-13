@@ -6,7 +6,6 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -14,13 +13,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 
 @Composable
-fun AddNewLayoutSelector(actionLayoutState: MutableState<ActionLayout?>) {
+fun AddNewLayoutSelector(
+    buttonText: String = "Click to add",
+    onAdd: (ActionLayout) -> Unit,
+) {
     var showMenu by remember { mutableStateOf(false) }
     Button(
         modifier = Modifier.padding(horizontal = step),
         onClick = { showMenu = !showMenu }
     ) {
-        Text("Body is empty. Click to add")
+        Text(buttonText)
     }
     DropdownMenu(
         expanded = showMenu,
@@ -28,19 +30,19 @@ fun AddNewLayoutSelector(actionLayoutState: MutableState<ActionLayout?>) {
     ) {
         DropdownMenuItem(
             text = { Text("Repeat while active") },
-            onClick = { actionLayoutState.value = ActionLayout.RepeatWhileActive() }
+            onClick = { onAdd(ActionLayout.RepeatWhileActive()) },
         )
         DropdownMenuItem(
             text = { Text("Retry until result") },
-            onClick = { actionLayoutState.value = ActionLayout.RetryUntilResult() }
+            onClick = { onAdd(ActionLayout.RetryUntilResult()) },
         )
         DropdownMenuItem(
             text = { Text("Sequential") },
-            onClick = { actionLayoutState.value = ActionLayout.Sequential() }
+            onClick = { onAdd(ActionLayout.Sequential()) },
         )
         DropdownMenuItem(
             text = { Text("Action") },
-            onClick = { actionLayoutState.value = ActionLayout.Action() }
+            onClick = { onAdd(ActionLayout.Action()) },
         )
     }
 }
