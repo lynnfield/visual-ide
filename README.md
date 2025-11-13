@@ -108,3 +108,15 @@ stub dropdown menu (which is in dark theme, btw). Next need to populate it with 
 add "addition" logic for all the ActionLayouts types.
 I quickly googled the dark theme problem and it appears that I need to wrap everything into
 Scaffold. How weird...
+
+Now I can add new "functions" to a ActionDefinition. Added all of them. Not reliable as I manually
+iterate over them. Now I need to be able to add RepeatWhileActive (renamed from RepeatUntilActive)
+into RetryUntilResult.
+Hey, I extracted TextBlock and ActionLayoutSelector, and creation of RetryUntilResult.render was a
+piece of cake! Now I'll add RepeatWhileActive and ActionLayout.Action as they should be pretty
+straightforward, and then will try to figure out the a to do Sequential.
+Completed them and also tweaked some stuff. Time to commit. Had a thought: what if I'll rewrite this
+document on each commit. So it'll be possible to read only the thoughts related to the exact commit,
+rather than everything at once.
+Quick thought: need to add a way to delete Actions, save and load them.
+However, next step is Sequential.
