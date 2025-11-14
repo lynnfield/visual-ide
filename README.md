@@ -128,3 +128,7 @@ Action, the first one gets stretched and the second one is squished.
 Damn it! I'm using fillMaxWidth() for TextBlocks...
 Not sure what to do. Cannot just remove it. Also should prohibit addition of Sequential to
 Sequential. Will leave it for tomorrow.
+
+Fixed the problem by explicitly setting Modifier.width(IntrinsicSize.Max) when rendering an item of
+Sequential.
+Hey, I did it! Can render Sequential properly. Now it'll be nice to save the tree.

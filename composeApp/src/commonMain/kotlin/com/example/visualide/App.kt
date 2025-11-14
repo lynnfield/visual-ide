@@ -64,16 +64,21 @@ private val LightNeonColorScheme = lightColorScheme(
 
 //region data model
 sealed class ActionLayout {
-    data class RepeatWhileActive(val body: MutableState<ActionLayout?> = mutableStateOf(null)) :
-        ActionLayout()
+    data class RepeatWhileActive(
+        val body: MutableState<ActionLayout?> = mutableStateOf(null)
+    ) : ActionLayout()
 
-    data class RetryUntilResult(val body: MutableState<ActionLayout?> = mutableStateOf(null)) :
-        ActionLayout()
+    data class RetryUntilResult(
+        val body: MutableState<ActionLayout?> = mutableStateOf(null)
+    ) : ActionLayout()
 
-    data class Sequential(val body: SnapshotStateList<ActionLayout> = mutableStateListOf()) :
-        ActionLayout()
-    data class Action(val name: MutableState<String> = mutableStateOf("New Action")) :
-        ActionLayout()
+    data class Sequential(
+        val body: SnapshotStateList<ActionLayout> = mutableStateListOf()
+    ) : ActionLayout()
+
+    data class Action(
+        val name: MutableState<String> = mutableStateOf("New Action")
+    ) : ActionLayout()
 }
 
 data class ActionDefinition(
@@ -97,7 +102,7 @@ fun ActionLayout.Sequential.Render(modifier: Modifier = Modifier) {
         modifier = modifier.width(IntrinsicSize.Min),
         horizontalArrangement = Arrangement.spacedBy(step),
     ) {
-        body.forEach { it.Render() }
+        body.forEach { it.Render(Modifier.width(IntrinsicSize.Max)) }
         AddNewLayoutSelector("+") { body += it }
     }
 }
