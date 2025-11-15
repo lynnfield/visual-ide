@@ -100,9 +100,14 @@ fun ActionLayout.Action.Render(modifier: Modifier = Modifier) {
 fun ActionLayout.Sequential.Render(modifier: Modifier = Modifier) {
     Row(
         modifier = modifier.width(IntrinsicSize.Min),
-        horizontalArrangement = Arrangement.spacedBy(step),
     ) {
-        body.forEach { it.Render(Modifier.width(IntrinsicSize.Max)) }
+        if (body.isNotEmpty()) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(step),
+            ) {
+                body.forEach { it.Render(Modifier.width(IntrinsicSize.Max)) }
+            }
+        }
         AddNewLayoutSelector("+") { body += it }
     }
 }
@@ -111,8 +116,9 @@ fun ActionLayout.Sequential.Render(modifier: Modifier = Modifier) {
 fun ActionLayout.RepeatWhileActive.Render(modifier: Modifier = Modifier) {
     Column(modifier = modifier.width(IntrinsicSize.Max)) {
         TextBlock("repeat while active")
-        body.value?.Render(Modifier.padding(horizontal = step))
-            ?: AddNewLayoutSelector(onAdd = body::value::set)
+        val paddings = Modifier.padding(horizontal = step)
+        body.value?.Render(paddings)
+            ?: AddNewLayoutSelector(modifier = paddings, onAdd = body::value::set)
     }
 }
 
@@ -120,8 +126,9 @@ fun ActionLayout.RepeatWhileActive.Render(modifier: Modifier = Modifier) {
 fun ActionLayout.RetryUntilResult.Render(modifier: Modifier = Modifier) {
     Column(modifier = modifier.width(IntrinsicSize.Max)) {
         TextBlock("retry until result")
-        body.value?.Render(Modifier.padding(horizontal = step))
-            ?: AddNewLayoutSelector(onAdd = body::value::set)
+        val paddings = Modifier.padding(horizontal = step)
+        body.value?.Render(paddings)
+            ?: AddNewLayoutSelector(modifier = paddings, onAdd = body::value::set)
     }
 }
 
@@ -137,8 +144,9 @@ fun ActionLayout.Render(modifier: Modifier = Modifier) = when (this) {
 fun ActionDefinition.Render(modifier: Modifier = Modifier) {
     Column(modifier = modifier.width(IntrinsicSize.Max)) {
         TextBlock(name)
-        body.value?.Render(Modifier.padding(horizontal = step))
-            ?: AddNewLayoutSelector(onAdd = body::value::set)
+        val paddings = Modifier.padding(horizontal = step)
+        body.value?.Render(paddings)
+            ?: AddNewLayoutSelector(modifier = paddings, onAdd = body::value::set)
     }
 }
 //endregion

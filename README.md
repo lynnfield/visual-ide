@@ -136,3 +136,8 @@ Hey, I did it! Can render Sequential properly. Now it'll be nice to save the tre
 Need to fix the bug with the ActionLayout selection dialog not disappearing when selection is made
 in Sequential element.
 Simple: just explicitly "close" is when an item is selected.
+
+Quick fix: sequential is looking better, I think. The plus button is not that far away from the
+other items.
+I think I need to convert this to a plugin for Intellij IDEA. It'll be easier to generate/modify
+kotlin code using IDE's capabilities.

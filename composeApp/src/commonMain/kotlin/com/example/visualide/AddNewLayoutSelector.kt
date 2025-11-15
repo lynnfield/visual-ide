@@ -1,6 +1,5 @@
 package com.example.visualide
 
-import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -15,6 +14,7 @@ import androidx.compose.ui.Modifier
 @Composable
 fun AddNewLayoutSelector(
     buttonText: String = "Click to add",
+    modifier: Modifier = Modifier,
     onAdd: (ActionLayout) -> Unit,
 ) {
     var showMenu by remember { mutableStateOf(false) }
@@ -23,7 +23,7 @@ fun AddNewLayoutSelector(
         onAdd(it)
     }
     Button(
-        modifier = Modifier.padding(horizontal = step),
+        modifier = modifier,
         onClick = { showMenu = !showMenu }
     ) {
         Text(buttonText)
