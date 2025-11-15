@@ -33,5 +33,6 @@ plugins {
 }
 
 include(":composeApp")
+include(":plugin")
 include(":server")
 include(":shared")

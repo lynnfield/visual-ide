@@ -141,3 +141,61 @@ Quick fix: sequential is looking better, I think. The plus button is not that fa
 other items.
 I think I need to convert this to a plugin for Intellij IDEA. It'll be easier to generate/modify
 kotlin code using IDE's capabilities.
+
+Need to start with
+this https://github.com/JetBrains/intellij-platform-compose-plugin-template/tree/main
+The plan is to copy just the essentials from the example to create a stub plugin with a UI. It'll
+allow me to work on a plugin instead of a web app. From that point I'll be able to save/load the
+results directly to a current project and in kotlin lang.
+What is gradle changelog plugin https://github.com/JetBrains/gradle-changelog-plugin? Never saw it
+before, maybe will check closely in the future.
+The current setup forces me to use `repositories()` withing build.gradle.kts within `:plugin`
+module. Want to move it to `settings.gradle.kts` in the future.
+There're some gradle properties that are used to build the plugin for different versions/types of
+IDEA, will ignore them for now as my target is Android Studio Otter 2025.2.1+. Cannot use it
+directly though. Some issue with versioning. But I assume that it should be like IDEA 2025.2.1, so
+I'll use it instead.
+Ok, I'll actually use gradle properties, as the plugin template pulls all the info from
+gradle.properties.
+`wrapper` task from the template was not resolving, but it looks like I don't need it: I already
+have gradle wrapper.
+Adding `plugin.xml`, will need to amend some parameters before release, will leave them as is for
+now.
+Will avoid `toolWindow#icon` for now.
+First of all will add a toolWindow as it is red in `plugin.xml`.
+Ok, managed to add `ToolWindowFactory` and now it is green in `plugin.xml`. Next step is to
+implement abstract methods of ToolWindowFactory. Will also rename mine to
+`VisualIdeToolWindowFactory`.
+Need to follow either chatApp or weatherApp examples from the template. Not sure which one to
+choose. Let it be a weather app. Both are not working with code, so no difference so far.
+It seems like I just need to do `toolWindow.addComposeTab("Name") { ComposeFunction() }` to create a
+tab with compose. To do this I need to add `:composeApp` as a dependency. Let see how it turns out.
+The `App()` compose function is accessible, but I'm not sure now that it is a right way, as
+`:composeApp` is not a library, but rather an app module. Let's run and see...
+Yeah, it's failed. Can simply move `App()` to the plugin's module for now.
+I'm wondering if I can create a compose multiplatform module containing a UI only.
+Added all the same compose dependencies as in `:composeApp`. Synced successfully. Let's run it.
+Failed to build. I assume that this is because of empty `CHANGELOG.md`.
+Don't see the plugin's window. Is it because of the icon?
+Oh, cool! It was because of icon. The panel has appeared, but crashed.
+Something with runtime deps
+`class androidx.compose.runtime.ComposerImpl cannot be cast to class androidx.compose.runtime.Composer`.
+Will try to remove preview and resources.
+No result. Will try to remove composeMultiplatform plugin and use material3 dependency directly.
+No result. It's weird that Compose and ComposerImpl are from different classloaders... Will remove
+material3 to see if it helps. I'm worried that the problem is within my project setup.
+Oh, I see, it looks like I'm allowed to use reduced number of elements from
+`org.jetbrains.jewel.ui.component`. Have to replace all the material3 components.
+Wow. It is awful, but it is working. I can show almost the same ui as it was. So now I have the
+plugin core and can work gradually towards generating the code. But first need to fix visual issues:
+
+- cannot move selector in text fields
+- `AddNewLayoutSelector` is not working properly: showing both button and dropdown. Need to fix it.
+  I can either use just dropdown with an empty state or hide button and show dropdown. I'll probably
+  go with the first option, although I don't know how to reuse it on other platforms.
+- cannot select "Repeat while active" as it is the first and selected by default option
+- "Sequential" looks awful because of `AddNewLayoutSelector`
+
+After fixing these I can start to work on generating code. It was a tough day...
+I'm afraid that I'll have to ditch all the other platforms, while doing the plugin. It is a tough,
+but right choice for now...

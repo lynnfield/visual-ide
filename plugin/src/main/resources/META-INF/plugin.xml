@@ -1,0 +1,17 @@
+<idea-plugin>
+    <id>com.genovich.visualide</id>
+    <name>Visual IDE</name>
+    <vendor url="https://www.yourcompany.com">YourCompany</vendor>
+
+    <dependencies>
+        <module name="intellij.platform.compose" />
+    </dependencies>
+
+    <!--    don't need this as I'm not using resource-bundles now -->
+    <!--    <resource-bundle>messages.ComposeTemplateBundle</resource-bundle>-->
+
+    <extensions defaultExtensionNs="com.intellij">
+        <toolWindow factoryClass="com.genovich.visualide.toolWindow.VisualIdeToolWindowFactory"
+            icon="com.genovich.visualide.ComposeIcons.ComposeToolWindow" id="VisualIDE" />
+    </extensions>
+</idea-plugin>
