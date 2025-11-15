@@ -132,3 +132,7 @@ Sequential. Will leave it for tomorrow.
 Fixed the problem by explicitly setting Modifier.width(IntrinsicSize.Max) when rendering an item of
 Sequential.
 Hey, I did it! Can render Sequential properly. Now it'll be nice to save the tree.
+
+Need to fix the bug with the ActionLayout selection dialog not disappearing when selection is made
+in Sequential element.
+Simple: just explicitly "close" is when an item is selected.

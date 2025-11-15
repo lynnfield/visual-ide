@@ -18,6 +18,10 @@ fun AddNewLayoutSelector(
     onAdd: (ActionLayout) -> Unit,
 ) {
     var showMenu by remember { mutableStateOf(false) }
+    val onAdd: (ActionLayout) -> Unit = {
+        showMenu = false
+        onAdd(it)
+    }
     Button(
         modifier = Modifier.padding(horizontal = step),
         onClick = { showMenu = !showMenu }
