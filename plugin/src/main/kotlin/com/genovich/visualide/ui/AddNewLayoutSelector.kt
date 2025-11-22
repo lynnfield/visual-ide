@@ -3,6 +3,8 @@ package com.genovich.visualide.ui
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import org.jetbrains.jewel.foundation.ExperimentalJewelApi
+import org.jetbrains.jewel.foundation.lazy.SelectableLazyListState
+import org.jetbrains.jewel.foundation.lazy.rememberSelectableLazyListState
 import org.jetbrains.jewel.ui.component.ListComboBox
 import org.jetbrains.jewel.ui.component.Text
 
@@ -14,11 +16,13 @@ private enum class AddNewLayoutSelectorOptions {
     Action,
 }
 
+@Suppress("ParamsComparedByRef")
 @OptIn(ExperimentalJewelApi::class)
 @Composable
 fun AddNewLayoutSelector(
     buttonText: String = "Click to add",
     modifier: Modifier = Modifier,
+    listState: SelectableLazyListState = rememberSelectableLazyListState(),
     onAdd: (ActionLayout) -> Unit,
 ) {
     val onAdd: (ActionLayout) -> Unit = { onAdd(it) }
@@ -36,6 +40,7 @@ fun AddNewLayoutSelector(
             }
         },
         itemKeys = { _, item -> item.name },
+        listState = listState,
     ) { item, _, _ ->
         when (item) {
             AddNewLayoutSelectorOptions.None -> Text(buttonText)

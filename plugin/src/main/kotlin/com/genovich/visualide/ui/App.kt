@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
@@ -26,6 +27,7 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import org.jetbrains.jewel.foundation.lazy.SelectableLazyListState
 import org.jetbrains.jewel.ui.component.DefaultButton
 import org.jetbrains.jewel.ui.component.Text
 import kotlin.time.ExperimentalTime
@@ -78,7 +80,11 @@ fun ActionLayout.Sequential.Render(modifier: Modifier = Modifier) {
                 body.forEach { it.Render(Modifier.width(IntrinsicSize.Max)) }
             }
         }
-        AddNewLayoutSelector("+") { body += it }
+        AddNewLayoutSelector(
+            buttonText = "+",
+            listState = remember(body.size) { SelectableLazyListState(LazyListState()) },
+            onAdd = { body += it },
+        )
     }
 }
 

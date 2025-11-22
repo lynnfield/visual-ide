@@ -213,3 +213,6 @@ the most flexible solution, taking in account that I want to allow users to add 
 later, but it'll do for now.
 Did it. Have a comment: dark theme sucks, it is grey on grey with black outline. Awful.
 Also need to figure out a way to hide the dropdown when an item is selected in Sequential.
+I didn't, but now I can select the same item each time the dropdown is opened.
+Good thing: I just realized that I'd fixed all the remaining plugin's UI issues and can move forward
+to code generation.
