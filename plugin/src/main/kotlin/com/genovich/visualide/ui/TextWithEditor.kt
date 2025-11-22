@@ -31,15 +31,17 @@ fun TextWithEditor(
         contentAlignment = Alignment.Center,
     ) {
         if (editor) {
-            var text by remember { state }
+            var text by remember { mutableStateOf(TextFieldValue(state.value)) }
+
             TextField(
-                value = TextFieldValue(
-                    text = text,
-                ),
-                onValueChange = { text = it.text },
+                value = text,
+                onValueChange = { text = it },
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
                 keyboardActions = KeyboardActions(
-                    onDone = { editor = false }
+                    onDone = {
+                        editor = false
+                        state.value = text.text
+                    }
                 ),
             )
         } else {

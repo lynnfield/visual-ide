@@ -199,3 +199,10 @@ plugin core and can work gradually towards generating the code. But first need t
 After fixing these I can start to work on generating code. It was a tough day...
 I'm afraid that I'll have to ditch all the other platforms, while doing the plugin. It is a tough,
 but right choice for now...
+
+It's a fixing day.
+First of all I dealt with TextWithEditor. Simple fix, the TextField just requires to have it's own
+state. Want to quickly check if I could add save on loosing focus.
+Not a simple thing: I've added Modifier.onFocusChanged() to the TextField that was doing the same
+instructions that keyboardActions.onDone() when there's no focus, but it is resetting everything
+instantly. I think I'll have to think about it later.
