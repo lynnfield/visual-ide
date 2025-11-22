@@ -1,15 +1,18 @@
 package com.genovich.visualide.ui
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import org.jetbrains.jewel.foundation.ExperimentalJewelApi
-import org.jetbrains.jewel.ui.component.DefaultButton
 import org.jetbrains.jewel.ui.component.ListComboBox
 import org.jetbrains.jewel.ui.component.Text
+
+private enum class AddNewLayoutSelectorOptions {
+    None,
+    RepeatWhileActive,
+    RetryUntilResult,
+    Sequential,
+    Action,
+}
 
 @OptIn(ExperimentalJewelApi::class)
 @Composable
@@ -18,34 +21,28 @@ fun AddNewLayoutSelector(
     modifier: Modifier = Modifier,
     onAdd: (ActionLayout) -> Unit,
 ) {
-    var showMenu by remember { mutableStateOf(false) }
-    val onAdd: (ActionLayout) -> Unit = {
-        showMenu = false
-        onAdd(it)
-    }
-    DefaultButton(
-        modifier = modifier,
-        onClick = { showMenu = !showMenu }
-    ) {
-        Text(buttonText)
-    }
-    val items = listOf(
-        ActionLayout.RepeatWhileActive(),
-        ActionLayout.RetryUntilResult(),
-        ActionLayout.Sequential(),
-        ActionLayout.Action(),
-    )
+    val onAdd: (ActionLayout) -> Unit = { onAdd(it) }
     ListComboBox(
-        items = items,
+        modifier = modifier,
+        items = AddNewLayoutSelectorOptions.entries,
         selectedIndex = 0,
-        onSelectedItemChange = { onAdd(items[it]) },
-        itemKeys = { _, item -> item.toString() },
+        onSelectedItemChange = { index ->
+            when (AddNewLayoutSelectorOptions.entries[index]) {
+                AddNewLayoutSelectorOptions.None -> Unit
+                AddNewLayoutSelectorOptions.RepeatWhileActive -> onAdd(ActionLayout.RepeatWhileActive())
+                AddNewLayoutSelectorOptions.RetryUntilResult -> onAdd(ActionLayout.RetryUntilResult())
+                AddNewLayoutSelectorOptions.Sequential -> onAdd(ActionLayout.Sequential())
+                AddNewLayoutSelectorOptions.Action -> onAdd(ActionLayout.Action())
+            }
+        },
+        itemKeys = { _, item -> item.name },
     ) { item, _, _ ->
         when (item) {
-            is ActionLayout.Action -> Text("Action")
-            is ActionLayout.RepeatWhileActive -> Text("Repeat while active")
-            is ActionLayout.RetryUntilResult -> Text("Retry until result")
-            is ActionLayout.Sequential -> Text("Sequential")
+            AddNewLayoutSelectorOptions.None -> Text(buttonText)
+            AddNewLayoutSelectorOptions.RepeatWhileActive -> Text("Repeat while active")
+            AddNewLayoutSelectorOptions.RetryUntilResult -> Text("Retry until result")
+            AddNewLayoutSelectorOptions.Sequential -> Text("Sequential")
+            AddNewLayoutSelectorOptions.Action -> Text("Action")
         }
     }
 }

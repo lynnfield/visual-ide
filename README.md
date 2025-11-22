@@ -206,3 +206,10 @@ state. Want to quickly check if I could add save on loosing focus.
 Not a simple thing: I've added Modifier.onFocusChanged() to the TextField that was doing the same
 instructions that keyboardActions.onDone() when there's no focus, but it is resetting everything
 instantly. I think I'll have to think about it later.
+Next is the fix for the AddNewLayoutSelector. As I mentioned I'll remove the call-to-action (CTA)
+button and leave just the dropdown. Maybe will change it in the future, but not now. Because of this
+decision and of how ListComboBox working I'll have to add an enum containing possible values. Not
+the most flexible solution, taking in account that I want to allow users to add custom ActionLayouts
+later, but it'll do for now.
+Did it. Have a comment: dark theme sucks, it is grey on grey with black outline. Awful.
+Also need to figure out a way to hide the dropdown when an item is selected in Sequential.
