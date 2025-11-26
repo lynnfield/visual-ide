@@ -236,3 +236,11 @@ to a diagram.
 Managed to implement reformatting. Had to spend some time to understand that I need to commit a
 Document before reformatting it. Also found out that actions names with spaces are not escaped. Now
 I'm thinking that I need to use PSI to generate code.
+PSI is hard. Need to understand a lot. Thinking that it would be easier with unit tests to see the
+outcomes.
+Decided to use backticks always for now.
+Had an issue with adding a class to PSI file, but it appears that I forgot to add a newline element.
+Ok, I started to get used to it. Not sure that it is intended to be like this, but I'm building PSI
+elements, adding to a parent block as text and then parsing to PSI again. Odd.
+At least I managed to create my first function in a file with a call to a dependency inside!
+I'm tired a bit, but there's some progress and I'm glad about it.

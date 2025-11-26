@@ -8,15 +8,18 @@ import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
+import com.intellij.openapi.vfs.findDirectory
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.psi.PsiDocumentManager
+import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
-import com.intellij.psi.PsiFileFactory
 import com.intellij.psi.PsiManager
 import com.intellij.psi.codeStyle.CodeStyleManager
 import org.jetbrains.jewel.bridge.addComposeTab
-import org.jetbrains.kotlin.idea.KotlinLanguage
+import org.jetbrains.kotlin.name.FqName
+import org.jetbrains.kotlin.psi.KtPsiFactory
+import kotlin.uuid.ExperimentalUuidApi
 
 class VisualIdeToolWindowFactory : ToolWindowFactory, DumbAware {
     override fun createToolWindowContent(
@@ -34,36 +37,39 @@ class VisualIdeToolWindowFactory : ToolWindowFactory, DumbAware {
 }
 
 private fun save(actionDefinition: ActionDefinition, project: Project) {
+    val psiElementFactory = KtPsiFactory(project)
+
     // todo make configurable
-    val dir = "src"
-    val actionsPackage = "com.example"
+    val dir = "src/main/kotlin"
+    val actionsPackage = FqName("com.example")
 
     val fileName = "${actionDefinition.name.value}.kt"
-    val fileContent = """
-        package $actionsPackage
-        
-        ${actionDefinition.generate()}
-    """.trimIndent()
+    val psiFile = psiElementFactory.createFile(fileName, "")
+
+    psiElementFactory.createPackageDirectiveIfNeeded(actionsPackage)
+    psiFile.add(psiElementFactory.createNewLine())
+    psiFile.add(actionDefinition.generate(psiElementFactory))
 
     // 1. EXECUTE WRITE ACTION (Required for modifying the project)
     WriteCommandAction.runWriteCommandAction(project) {
-        val targetVirtualFile = project.guessProjectDir()?.findChild(dir) ?: run {
+        val targetVirtualFile = project.guessProjectDir()?.findDirectory(dir) ?: run {
             println("$dir not found")
             return@runWriteCommandAction
         }
+
         val targetDirectory =
-            PsiManager.getInstance(project).findDirectory(targetVirtualFile) ?: run {
+            PsiManager.getInstance(project).findDirectory(targetVirtualFile)?.let {
+                actionsPackage.pathSegments().fold(it) { dir, name ->
+                    dir.findSubdirectory(name.identifier) ?: dir.createSubdirectory(name.identifier)
+                }
+            } ?: run {
                 println("$targetVirtualFile not found")
                 return@runWriteCommandAction
             }
 
         // find and rewrite or create a new file
-        val file = targetDirectory.findFile(fileName)?.also { it.fileDocument.setText(fileContent) }
-            ?: PsiFileFactory.getInstance(project).createFileFromText(
-                fileName,
-                KotlinLanguage.INSTANCE,
-                fileContent
-            ).let { targetDirectory.add(it) as PsiFile }
+        targetDirectory.findFile(psiFile.name)?.delete()
+        val file = targetDirectory.add(psiFile) as PsiFile
 
         // have to commit the document before reformatting
         PsiDocumentManager.getInstance(project).commitDocument(file.fileDocument)
@@ -77,54 +83,65 @@ private fun save(actionDefinition: ActionDefinition, project: Project) {
     }
 }
 
-fun ActionDefinition.generate(): String {
-    // todo name escaping if needed
+@OptIn(ExperimentalUuidApi::class)
+fun ActionDefinition.generate(psiElementFactory: KtPsiFactory): PsiElement {
     // todo imports
     // todo return???
     // todo propagate used Action names up to the top level
     // todo inputs in sequential calls
-    return """
-        class ${name.value}<Input, Output> : Action<Input, Output>() {
-            override suspend fun invoke(input: Input): Output {
-                ${body.value?.generate() ?: stubBody()}
+    return psiElementFactory.createClass(
+        """
+            // $id
+            class `${name.value}`<Input, Output> : com.genovich.components.Action<Input, Output>() {
+                override suspend fun invoke(input: Input): Output {
+                    ${(body.value?.generate(psiElementFactory) ?: todoStub(psiElementFactory)).text}
+                }
             }
+        """.trimIndent()
+    )
+}
+
+fun ActionLayout.Action.generate(psiElementFactory: KtPsiFactory): PsiElement {
+    return psiElementFactory.createExpression("`${name.value}`()")
+}
+
+fun ActionLayout.RetryUntilResult.generate(psiElementFactory: KtPsiFactory): PsiElement {
+    return psiElementFactory.createExpression(
+        """
+            retryUntilResult {
+                ${body.value?.generate(psiElementFactory) ?: todoStub(psiElementFactory)}
+            }
+        """.trimIndent()
+    )
+}
+
+fun ActionLayout.RepeatWhileActive.generate(psiElementFactory: KtPsiFactory): PsiElement {
+    return psiElementFactory.createExpression(
+        """
+            repeatWhileActive {
+                ${body.value?.generate(psiElementFactory) ?: todoStub(psiElementFactory)}
+            }
+        """.trimIndent()
+    )
+}
+
+fun ActionLayout.Sequential.generate(psiElementFactory: KtPsiFactory): PsiElement {
+    return body
+        .takeIf { it.isNotEmpty() }
+        ?.fold(psiElementFactory.createBlockCodeFragment("", null) as PsiElement) { acc, action ->
+            acc.add(action.generate(psiElementFactory))
         }
-    """.trimIndent()
+        ?: todoStub(psiElementFactory)
 }
 
-fun ActionLayout.Action.generate(): String {
-    return """
-        ${name.value}()
-    """.trimIndent()
-}
-
-fun ActionLayout.RetryUntilResult.generate(): String {
-    return """
-        retryUntilResult {
-            ${body.value?.generate() ?: stubBody()}
-        }
-    """.trimIndent()
-}
-
-fun ActionLayout.RepeatWhileActive.generate(): String {
-    return """
-        repeatWhileActive {
-            ${body.value?.generate() ?: stubBody()}
-        }
-    """.trimIndent()
-}
-
-fun ActionLayout.Sequential.generate(): String {
-    return body.joinToString("\n") { it.generate() }
-}
-
-fun ActionLayout.generate(): String {
+fun ActionLayout.generate(psiElementFactory: KtPsiFactory): PsiElement {
     return when (this) {
-        is ActionLayout.Action -> generate()
-        is ActionLayout.RepeatWhileActive -> generate()
-        is ActionLayout.RetryUntilResult -> generate()
-        is ActionLayout.Sequential -> generate()
+        is ActionLayout.Action -> generate(psiElementFactory)
+        is ActionLayout.RepeatWhileActive -> generate(psiElementFactory)
+        is ActionLayout.RetryUntilResult -> generate(psiElementFactory)
+        is ActionLayout.Sequential -> generate(psiElementFactory)
     }
 }
 
-fun stubBody(): String = "TODO(\"implement body\")"
+fun todoStub(psiElementFactory: KtPsiFactory): PsiElement =
+    psiElementFactory.createExpression("TODO(\"implement body\")")
