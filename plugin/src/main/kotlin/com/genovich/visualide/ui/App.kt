@@ -27,6 +27,7 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import org.jetbrains.jewel.foundation.lazy.SelectableLazyListState
 import org.jetbrains.jewel.ui.component.DefaultButton
 import org.jetbrains.jewel.ui.component.Text
@@ -129,7 +130,9 @@ fun ActionDefinition.Render(modifier: Modifier = Modifier) {
 
 @OptIn(ExperimentalTime::class)
 @Composable
-fun App() {
+fun App(
+    onSave: (ActionDefinition) -> Unit,
+) {
     isSystemInDarkTheme()
 
 //    val actions = listOf(
@@ -153,6 +156,8 @@ fun App() {
 
     val actions = remember { mutableStateMapOf<Uuid, ActionDefinition>() }
     var currentActionId by remember(actions) { mutableStateOf(actions.keys.firstOrNull()) }
+    val currentAction = remember(actions, currentActionId) { actions[currentActionId] }
+
 
     Box(Modifier.fillMaxSize()) {
         Column(
@@ -160,7 +165,7 @@ fun App() {
                 .align(Alignment.Center)
                 .horizontalScroll(ScrollState(0))
         ) {
-            currentActionId?.let { actions[it] }?.Render(Modifier.wrapContentSize())
+            currentAction?.Render(Modifier.wrapContentSize())
                 ?: DefaultButton(
                     onClick = {
                         val action = ActionDefinition(
@@ -172,6 +177,19 @@ fun App() {
                 ) {
                     Text("Nothing to show. Click to add an action.")
                 }
+        }
+
+        DefaultButton(
+            onClick = { currentAction?.also(onSave) },
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(16.dp),
+            enabled = currentAction != null
+        ) {
+            Text(
+                text = "Save",
+                fontSize = 16.sp,
+            )
         }
     }
 }

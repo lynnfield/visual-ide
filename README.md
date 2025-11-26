@@ -216,3 +216,23 @@ Also need to figure out a way to hide the dropdown when an item is selected in S
 I didn't, but now I can select the same item each time the dropdown is opened.
 Good thing: I just realized that I'd fixed all the remaining plugin's UI issues and can move forward
 to code generation.
+
+Ok, it is time to generate some code. I'd talked to Gemini and it helped me to figure out a way to
+write files. My plan for today is to add the code suggested by Gemini, add couple of input fields to
+edit the generated file location and package, and check if it works.
+Added a button to save and it's functionality. Looks ok. Next - logic.
+I was about to create a validator/parser, but then realised that I don't care: rubbish in, rubbish
+out. Will fix it in the future.
+I added the code and its "java.lang.NoClassDefFoundError: org/jetbrains/kotlin/idea/KotlinLanguage".
+Trying to understand why.
+FUUUUUUUU!!!!!! You have to declare `org.jetbrains.kotlin` in `plugin.xml` in order to "tell" IDEA
+that you want to depend on the plugin (assume it will add needed jar to your classloader) and in
+`gradle.properties` (actually in `dependencies.intellijiPlatform.plugins` in `build.gradle.kts`) to
+have this plugin bundled to your testing IDE. RTFM =( At least it works.
+What I have now: can generate code. Want to format it. Next need to propagate functions to
+constructor, derive types, figure out if I need and how to decide the return statement. After this
+I'll need to figure out how to generate assemblies. Also need to parse functions and assemblies back
+to a diagram.
+Managed to implement reformatting. Had to spend some time to understand that I need to commit a
+Document before reformatting it. Also found out that actions names with spaces are not escaped. Now
+I'm thinking that I need to use PSI to generate code.
