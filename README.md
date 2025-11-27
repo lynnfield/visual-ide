@@ -244,3 +244,9 @@ Ok, I started to get used to it. Not sure that it is intended to be like this, b
 elements, adding to a parent block as text and then parsing to PSI again. Odd.
 At least I managed to create my first function in a file with a call to a dependency inside!
 I'm tired a bit, but there's some progress and I'm glad about it.
+
+Want to "polish" generation of each ActionLayout and then want to find a way to propagate called
+actions upwards to add them as the Action dependencies.
+I came up with a simple solution: collect all the Actions in the current ActionDefinition and just
+add them to the constructor. Also decided to use fully qualified names. Wondering if I need PSI for
+all of these.

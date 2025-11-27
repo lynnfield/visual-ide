@@ -36,22 +36,41 @@ import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
 //region data model
-sealed class ActionLayout {
+sealed class ActionLayout : Iterable<ActionLayout> {
     data class RepeatWhileActive(
         val body: MutableState<ActionLayout?> = mutableStateOf(null)
-    ) : ActionLayout()
+    ) : ActionLayout() {
+        override fun iterator(): Iterator<ActionLayout> = iterator {
+            yield(this@RepeatWhileActive)
+            body.value?.also { yieldAll(it) }
+        }
+    }
 
     data class RetryUntilResult(
         val body: MutableState<ActionLayout?> = mutableStateOf(null)
-    ) : ActionLayout()
+    ) : ActionLayout() {
+        override fun iterator(): Iterator<ActionLayout> = iterator {
+            yield(this@RetryUntilResult)
+            body.value?.also { yieldAll(it) }
+        }
+    }
 
     data class Sequential(
         val body: SnapshotStateList<ActionLayout> = mutableStateListOf()
-    ) : ActionLayout()
+    ) : ActionLayout() {
+        override fun iterator(): Iterator<ActionLayout> = iterator {
+            yield(this@Sequential)
+            body.forEach { yieldAll(it) }
+        }
+    }
 
     data class Action(
         val name: MutableState<String> = mutableStateOf("New Action")
-    ) : ActionLayout()
+    ) : ActionLayout() {
+        override fun iterator(): Iterator<ActionLayout> = iterator {
+            yield(this@Action)
+        }
+    }
 }
 
 data class ActionDefinition(
@@ -84,7 +103,7 @@ fun ActionLayout.Sequential.Render(modifier: Modifier = Modifier) {
         AddNewLayoutSelector(
             buttonText = "+",
             listState = remember(body.size) { SelectableLazyListState(LazyListState()) },
-            onAdd = { body += it },
+            onAdd = { body.add(it) },
         )
     }
 }

@@ -87,12 +87,24 @@ private fun save(actionDefinition: ActionDefinition, project: Project) {
 fun ActionDefinition.generate(psiElementFactory: KtPsiFactory): PsiElement {
     // todo imports
     // todo return???
-    // todo propagate used Action names up to the top level
     // todo inputs in sequential calls
+    val actions =
+        body.value
+            ?.filterIsInstance<ActionLayout.Action>()
+            ?.distinctBy { it.name.value }
+            ?.joinToString {
+                psiElementFactory.createProperty(
+                    "`${it.name.value}`",
+                    "com.genovich.components.Action<Input, Output>",
+                    false
+                ).text
+            }
+            .orEmpty()
+
     return psiElementFactory.createClass(
         """
             // $id
-            class `${name.value}`<Input, Output> : com.genovich.components.Action<Input, Output>() {
+            class `${name.value}`<Input, Output>($actions) : com.genovich.components.Action<Input, Output>() {
                 override suspend fun invoke(input: Input): Output {
                     ${(body.value?.generate(psiElementFactory) ?: todoStub(psiElementFactory)).text}
                 }
@@ -106,32 +118,32 @@ fun ActionLayout.Action.generate(psiElementFactory: KtPsiFactory): PsiElement {
 }
 
 fun ActionLayout.RetryUntilResult.generate(psiElementFactory: KtPsiFactory): PsiElement {
-    return psiElementFactory.createExpression(
+    return psiElementFactory.createBlockCodeFragment(
         """
-            retryUntilResult {
-                ${body.value?.generate(psiElementFactory) ?: todoStub(psiElementFactory)}
+            com.genovich.components.retryUntilResult {
+                ${(body.value?.generate(psiElementFactory) ?: todoStub(psiElementFactory)).text}
             }
-        """.trimIndent()
+        """.trimIndent(),
+        null,
     )
 }
 
 fun ActionLayout.RepeatWhileActive.generate(psiElementFactory: KtPsiFactory): PsiElement {
-    return psiElementFactory.createExpression(
+    return psiElementFactory.createBlockCodeFragment(
         """
-            repeatWhileActive {
-                ${body.value?.generate(psiElementFactory) ?: todoStub(psiElementFactory)}
+            com.genovich.components.repeatWhileActive {
+                ${(body.value?.generate(psiElementFactory) ?: todoStub(psiElementFactory)).text}
             }
-        """.trimIndent()
+        """.trimIndent(),
+        null,
     )
 }
 
 fun ActionLayout.Sequential.generate(psiElementFactory: KtPsiFactory): PsiElement {
-    return body
-        .takeIf { it.isNotEmpty() }
-        ?.fold(psiElementFactory.createBlockCodeFragment("", null) as PsiElement) { acc, action ->
-            acc.add(action.generate(psiElementFactory))
-        }
-        ?: todoStub(psiElementFactory)
+    val joinToString =
+        body.takeIf { it.isNotEmpty() }?.joinToString("\n") { it.generate(psiElementFactory).text }
+            ?: todoStub(psiElementFactory).text
+    return psiElementFactory.createBlockCodeFragment(joinToString, null)
 }
 
 fun ActionLayout.generate(psiElementFactory: KtPsiFactory): PsiElement {
