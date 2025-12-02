@@ -110,36 +110,28 @@ fun ActionDefinition.generate(): String {
 
 fun ActionLayout.Action.generate(): String = "`${name.value}`()"
 
-fun ActionLayout.RetryUntilResult.generate(): String {
-    return """
-        com.genovich.components.retryUntilResult {
-            ${(body.value?.generate() ?: todoStub())}
-        }
-    """.trimIndent()
-}
-
-fun ActionLayout.RepeatWhileActive.generate(): String {
-    return """
-        com.genovich.components.repeatWhileActive {
-            ${(body.value?.generate() ?: todoStub())}
-        }
-    """.trimIndent()
-}
-
-fun ActionLayout.Sequential.generate(): String {
-    return body
-        .takeIf { it.isNotEmpty() }
-        ?.joinToString("\n") { it.generate() }
-        ?: todoStub()
-}
-
-fun ActionLayout.generate(): String {
-    return when (this) {
-        is ActionLayout.Action -> generate()
-        is ActionLayout.RepeatWhileActive -> generate()
-        is ActionLayout.RetryUntilResult -> generate()
-        is ActionLayout.Sequential -> generate()
+fun ActionLayout.RetryUntilResult.generate(): String = """
+    com.genovich.components.retryUntilResult {
+        ${(body.value?.generate() ?: todoStub())}
     }
+""".trimIndent()
+
+fun ActionLayout.RepeatWhileActive.generate(): String = """
+    com.genovich.components.repeatWhileActive {
+        ${(body.value?.generate() ?: todoStub())}
+    }
+""".trimIndent()
+
+fun ActionLayout.Sequential.generate(): String = body
+    .takeIf { it.isNotEmpty() }
+    ?.joinToString("\n") { it.generate() }
+    ?: todoStub()
+
+fun ActionLayout.generate(): String = when (this) {
+    is ActionLayout.Action -> generate()
+    is ActionLayout.RepeatWhileActive -> generate()
+    is ActionLayout.RetryUntilResult -> generate()
+    is ActionLayout.Sequential -> generate()
 }
 
 fun todoStub(): String = """TODO("implement body")"""

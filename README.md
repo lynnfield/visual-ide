@@ -257,3 +257,6 @@ function and then to pass results of each function to the next one. I could eith
 counter" to create unique variables all over an Action, or I could just call them in a way that
 don't require me to deal with variables at all. This will make the whole call chain a single
 expression and I'll not have to deal with variables or return.
+
+I think that I'll need two types for Sequential layout or a flag to distinguish just a sequential
+calls from a calls that are passing their results to a next function.
