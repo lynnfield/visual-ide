@@ -250,3 +250,10 @@ actions upwards to add them as the Action dependencies.
 I came up with a simple solution: collect all the Actions in the current ActionDefinition and just
 add them to the constructor. Also decided to use fully qualified names. Wondering if I need PSI for
 all of these.
+
+Removed part of PSI stuff as it is not needed to generate code.
+I'm thinking about dealing with Sequential call: I need a way to pass the input value to the first
+function and then to pass results of each function to the next one. I could either add a "variables
+counter" to create unique variables all over an Action, or I could just call them in a way that
+don't require me to deal with variables at all. This will make the whole call chain a single
+expression and I'll not have to deal with variables or return.

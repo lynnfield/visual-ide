@@ -12,7 +12,6 @@ import com.intellij.openapi.vfs.findDirectory
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
 import com.intellij.psi.PsiDocumentManager
-import com.intellij.psi.PsiElement
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiManager
 import com.intellij.psi.codeStyle.CodeStyleManager
@@ -48,7 +47,7 @@ private fun save(actionDefinition: ActionDefinition, project: Project) {
 
     psiElementFactory.createPackageDirectiveIfNeeded(actionsPackage)
     psiFile.add(psiElementFactory.createNewLine())
-    psiFile.add(actionDefinition.generate(psiElementFactory))
+    psiFile.add(psiElementFactory.createClass(actionDefinition.generate()))
 
     // 1. EXECUTE WRITE ACTION (Required for modifying the project)
     WriteCommandAction.runWriteCommandAction(project) {
@@ -84,76 +83,63 @@ private fun save(actionDefinition: ActionDefinition, project: Project) {
 }
 
 @OptIn(ExperimentalUuidApi::class)
-fun ActionDefinition.generate(psiElementFactory: KtPsiFactory): PsiElement {
-    // todo imports
+fun ActionDefinition.generate(): String {
     // todo return???
     // todo inputs in sequential calls
     val actions =
         body.value
             ?.filterIsInstance<ActionLayout.Action>()
             ?.distinctBy { it.name.value }
-            ?.joinToString {
-                psiElementFactory.createProperty(
-                    "`${it.name.value}`",
-                    "com.genovich.components.Action<Input, Output>",
-                    false
-                ).text
+            ?.joinToString(
+                separator = ",\n",
+                prefix = "\n",
+                postfix = ",\n",
+            ) {
+                "val `${it.name.value}`: com.genovich.components.Action<Input, Output>,"
             }
             .orEmpty()
 
-    return psiElementFactory.createClass(
-        """
-            // $id
-            class `${name.value}`<Input, Output>($actions) : com.genovich.components.Action<Input, Output>() {
-                override suspend fun invoke(input: Input): Output {
-                    ${(body.value?.generate(psiElementFactory) ?: todoStub(psiElementFactory)).text}
-                }
+    return """
+        class `${name.value}`<Input, Output>($actions) : com.genovich.components.Action<Input, Output>() {
+            override suspend fun invoke(input: Input): Output {
+                ${(body.value?.generate() ?: todoStub())}
             }
-        """.trimIndent()
-    )
+        }
+    """.trimIndent()
 }
 
-fun ActionLayout.Action.generate(psiElementFactory: KtPsiFactory): PsiElement {
-    return psiElementFactory.createExpression("`${name.value}`()")
+fun ActionLayout.Action.generate(): String = "`${name.value}`()"
+
+fun ActionLayout.RetryUntilResult.generate(): String {
+    return """
+        com.genovich.components.retryUntilResult {
+            ${(body.value?.generate() ?: todoStub())}
+        }
+    """.trimIndent()
 }
 
-fun ActionLayout.RetryUntilResult.generate(psiElementFactory: KtPsiFactory): PsiElement {
-    return psiElementFactory.createBlockCodeFragment(
-        """
-            com.genovich.components.retryUntilResult {
-                ${(body.value?.generate(psiElementFactory) ?: todoStub(psiElementFactory)).text}
-            }
-        """.trimIndent(),
-        null,
-    )
+fun ActionLayout.RepeatWhileActive.generate(): String {
+    return """
+        com.genovich.components.repeatWhileActive {
+            ${(body.value?.generate() ?: todoStub())}
+        }
+    """.trimIndent()
 }
 
-fun ActionLayout.RepeatWhileActive.generate(psiElementFactory: KtPsiFactory): PsiElement {
-    return psiElementFactory.createBlockCodeFragment(
-        """
-            com.genovich.components.repeatWhileActive {
-                ${(body.value?.generate(psiElementFactory) ?: todoStub(psiElementFactory)).text}
-            }
-        """.trimIndent(),
-        null,
-    )
+fun ActionLayout.Sequential.generate(): String {
+    return body
+        .takeIf { it.isNotEmpty() }
+        ?.joinToString("\n") { it.generate() }
+        ?: todoStub()
 }
 
-fun ActionLayout.Sequential.generate(psiElementFactory: KtPsiFactory): PsiElement {
-    val joinToString =
-        body.takeIf { it.isNotEmpty() }?.joinToString("\n") { it.generate(psiElementFactory).text }
-            ?: todoStub(psiElementFactory).text
-    return psiElementFactory.createBlockCodeFragment(joinToString, null)
-}
-
-fun ActionLayout.generate(psiElementFactory: KtPsiFactory): PsiElement {
+fun ActionLayout.generate(): String {
     return when (this) {
-        is ActionLayout.Action -> generate(psiElementFactory)
-        is ActionLayout.RepeatWhileActive -> generate(psiElementFactory)
-        is ActionLayout.RetryUntilResult -> generate(psiElementFactory)
-        is ActionLayout.Sequential -> generate(psiElementFactory)
+        is ActionLayout.Action -> generate()
+        is ActionLayout.RepeatWhileActive -> generate()
+        is ActionLayout.RetryUntilResult -> generate()
+        is ActionLayout.Sequential -> generate()
     }
 }
 
-fun todoStub(psiElementFactory: KtPsiFactory): PsiElement =
-    psiElementFactory.createExpression("TODO(\"implement body\")")
+fun todoStub(): String = """TODO("implement body")"""
