@@ -260,3 +260,9 @@ expression and I'll not have to deal with variables or return.
 
 I think that I'll need two types for Sequential layout or a flag to distinguish just a sequential
 calls from a calls that are passing their results to a next function.
+
+Added arguments passing. Fun to see that the system does exactly what I want, but I don't really
+understand what am I doing: decided that I can just fold Sequential and call functions in place
+without creating an explicit variables to pass the results to the next function, but it leads to a
+part of sequential expression migrates into `repeatWhileActiva` etc. Will not fix it now. Want to do
+parsing a code into the diagram first.

@@ -90,48 +90,45 @@ fun ActionDefinition.generate(): String {
         body.value
             ?.filterIsInstance<ActionLayout.Action>()
             ?.distinctBy { it.name.value }
-            ?.joinToString(
-                separator = ",\n",
-                prefix = "\n",
-                postfix = ",\n",
-            ) {
-                "val `${it.name.value}`: com.genovich.components.Action<Input, Output>,"
+            ?.joinToString(separator = ",\n", prefix = "\n", postfix = ",\n") {
+                "val `${it.name.value}`: com.genovich.components.Action<Input, Output>"
             }
             .orEmpty()
 
+    val input = "input"
     return """
         class `${name.value}`<Input, Output>($actions) : com.genovich.components.Action<Input, Output>() {
-            override suspend fun invoke(input: Input): Output {
-                ${(body.value?.generate() ?: todoStub())}
+            override suspend fun invoke($input: Input): Output {
+                return ${(body.value?.generate(input) ?: todoStub())}
             }
         }
     """.trimIndent()
 }
 
-fun ActionLayout.Action.generate(): String = "`${name.value}`()"
+fun ActionLayout.Action.generate(input: String): String = "`${name.value}`($input)"
 
-fun ActionLayout.RetryUntilResult.generate(): String = """
+fun ActionLayout.RetryUntilResult.generate(input: String): String = """
     com.genovich.components.retryUntilResult {
-        ${(body.value?.generate() ?: todoStub())}
+        ${(body.value?.generate(input) ?: todoStub())}
     }
 """.trimIndent()
 
-fun ActionLayout.RepeatWhileActive.generate(): String = """
+fun ActionLayout.RepeatWhileActive.generate(input: String): String = """
     com.genovich.components.repeatWhileActive {
-        ${(body.value?.generate() ?: todoStub())}
+        ${(body.value?.generate(input) ?: todoStub())}
     }
 """.trimIndent()
 
-fun ActionLayout.Sequential.generate(): String = body
+fun ActionLayout.Sequential.generate(input: String): String = body
     .takeIf { it.isNotEmpty() }
-    ?.joinToString("\n") { it.generate() }
+    ?.fold(input) { exp, layout -> layout.generate(exp) }
     ?: todoStub()
 
-fun ActionLayout.generate(): String = when (this) {
-    is ActionLayout.Action -> generate()
-    is ActionLayout.RepeatWhileActive -> generate()
-    is ActionLayout.RetryUntilResult -> generate()
-    is ActionLayout.Sequential -> generate()
+fun ActionLayout.generate(inputParamName: String): String = when (this) {
+    is ActionLayout.Action -> generate(inputParamName)
+    is ActionLayout.RepeatWhileActive -> generate(inputParamName)
+    is ActionLayout.RetryUntilResult -> generate(inputParamName)
+    is ActionLayout.Sequential -> generate(inputParamName)
 }
 
 fun todoStub(): String = """TODO("implement body")"""
