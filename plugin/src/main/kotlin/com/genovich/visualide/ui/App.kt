@@ -4,7 +4,6 @@ package com.genovich.visualide.ui
 
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.horizontalScroll
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -77,7 +76,17 @@ data class ActionDefinition(
     val name: MutableState<String>,
     val body: MutableState<ActionLayout?> = mutableStateOf(null),
     val id: Uuid = Uuid.random(),
-)
+) {
+    constructor(
+        name: String,
+        body: ActionLayout? = null,
+        id: Uuid = Uuid.random(),
+    ) : this(
+        name = mutableStateOf(name),
+        body = mutableStateOf(body),
+        id = id,
+    )
+}
 //endregion
 
 //region render
@@ -150,33 +159,15 @@ fun ActionDefinition.Render(modifier: Modifier = Modifier) {
 @OptIn(ExperimentalTime::class)
 @Composable
 fun App(
+    initial: Map<Uuid, ActionDefinition>,
     onSave: (ActionDefinition) -> Unit,
 ) {
-    isSystemInDarkTheme()
-
-//    val actions = listOf(
-//        ActionDefinition(
-//            "EntryPoint",
-//            null,
-//            null,
-//            ActionLayout.RetryUntilResult(
-//                ActionLayout.RepeatUntilActive(
-//                    ActionLayout.Sequential(
-//                        listOf(
-//                            ActionLayout.Action("login"),
-//                            ActionLayout.Action("process anonymous state"),
-//                            ActionLayout.Action("process authorised state"),
-//                        )
-//                    )
-//                )
-//            )
-//        )
-//    ).associateBy { it.name }
-
-    val actions = remember { mutableStateMapOf<Uuid, ActionDefinition>() }
+    val actions = remember(initial) {
+        mutableStateMapOf(*initial.map { (uuid, actionDefinition) -> uuid to actionDefinition }
+            .toTypedArray())
+    }
     var currentActionId by remember(actions) { mutableStateOf(actions.keys.firstOrNull()) }
-    val currentAction = remember(actions, currentActionId) { actions[currentActionId] }
-
+    val currentAction = actions[currentActionId]
 
     Box(Modifier.fillMaxSize()) {
         Column(

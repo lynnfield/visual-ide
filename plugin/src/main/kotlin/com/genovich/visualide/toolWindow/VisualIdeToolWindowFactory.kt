@@ -1,10 +1,17 @@
+@file:OptIn(ExperimentalUuidApi::class)
+
 package com.genovich.visualide.toolWindow
 
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import com.genovich.visualide.ui.ActionDefinition
 import com.genovich.visualide.ui.ActionLayout
 import com.genovich.visualide.ui.App
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileEditor.FileEditorManager
+import com.intellij.openapi.fileEditor.FileEditorManagerEvent
+import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
@@ -15,9 +22,14 @@ import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiManager
 import com.intellij.psi.codeStyle.CodeStyleManager
+import com.intellij.util.messages.impl.subscribeAsFlow
+import kotlinx.coroutines.flow.map
 import org.jetbrains.jewel.bridge.addComposeTab
+import org.jetbrains.kotlin.idea.core.util.toPsiFile
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.KtPsiFactory
+import org.jetbrains.uast.UFile
+import org.jetbrains.uast.toUElementOfType
 import kotlin.uuid.ExperimentalUuidApi
 
 class VisualIdeToolWindowFactory : ToolWindowFactory, DumbAware {
@@ -25,11 +37,45 @@ class VisualIdeToolWindowFactory : ToolWindowFactory, DumbAware {
         project: Project,
         toolWindow: ToolWindow
     ) {
+        val fileEditorManagerEvents =
+            project.messageBus.subscribeAsFlow(FileEditorManagerListener.FILE_EDITOR_MANAGER) {
+                object : FileEditorManagerListener {
+                    override fun selectionChanged(event: FileEditorManagerEvent) {
+                        trySend(event)
+                    }
+                }
+            }
+
         toolWindow.addComposeTab("Visual IDE") {
+            val currentFile by fileEditorManagerEvents.map { it.newFile }
+                .collectAsState(FileEditorManager.getInstance(project).selectedFiles.firstOrNull())
+            val definitions = remember(currentFile) {
+                val uFile = currentFile
+                    ?.toPsiFile(project)
+                    ?.toUElementOfType<UFile>()
+
+                val classes = uFile?.classes.orEmpty()
+
+                classes
+                    .filter { uClass ->
+                        uClass
+                            .uastSuperTypes
+                            .any { it.getQualifiedName() == "com.genovich.components.Action" } // todo make configurable
+                    }
+                    .map { uClass ->
+                        println(uClass.name)
+                        ActionDefinition(
+                            name = uClass.name ?: "Unknown",
+                        )
+                    }
+                    .associateBy { it.id }
+            }
+
+            println(definitions)
+
             App(
-                onSave = {
-                    save(it, project)
-                },
+                initial = definitions,
+                onSave = { save(it, project) },
             )
         }
     }

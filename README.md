@@ -266,3 +266,7 @@ understand what am I doing: decided that I can just fold Sequential and call fun
 without creating an explicit variables to pass the results to the next function, but it leads to a
 part of sequential expression migrates into `repeatWhileActiva` etc. Will not fix it now. Want to do
 parsing a code into the diagram first.
+
+Managed to parse classes that are successors to Actions into ActionDefinition structure. Just names,
+but it is a good start. For some reason I don't see any UI at all. However I can see that an
+ActionDefinition is "selected", thus should be shown.
