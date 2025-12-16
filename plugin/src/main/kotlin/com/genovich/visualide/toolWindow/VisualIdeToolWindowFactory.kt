@@ -2,12 +2,16 @@
 
 package com.genovich.visualide.toolWindow
 
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import com.genovich.visualide.ui.ActionDefinition
 import com.genovich.visualide.ui.ActionLayout
 import com.genovich.visualide.ui.App
+import com.intellij.openapi.application.smartReadAction
 import com.intellij.openapi.command.WriteCommandAction
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
@@ -31,6 +35,7 @@ import org.jetbrains.kotlin.psi.KtPsiFactory
 import org.jetbrains.uast.UFile
 import org.jetbrains.uast.toUElementOfType
 import kotlin.uuid.ExperimentalUuidApi
+import kotlin.uuid.Uuid
 
 class VisualIdeToolWindowFactory : ToolWindowFactory, DumbAware {
     override fun createToolWindowContent(
@@ -47,34 +52,42 @@ class VisualIdeToolWindowFactory : ToolWindowFactory, DumbAware {
             }
 
         toolWindow.addComposeTab("Visual IDE") {
-            val currentFile by fileEditorManagerEvents.map { it.newFile }
+            val currentFile by fileEditorManagerEvents
+                .map { it.newFile }
                 .collectAsState(FileEditorManager.getInstance(project).selectedFiles.firstOrNull())
-            val definitions = remember(currentFile) {
-                val uFile = currentFile
-                    ?.toPsiFile(project)
-                    ?.toUElementOfType<UFile>()
 
-                val classes = uFile?.classes.orEmpty()
+            val actions = remember { mutableStateMapOf<Uuid, ActionDefinition>() }
+            val currentActionId = remember(actions) { mutableStateOf(actions.keys.firstOrNull()) }
 
-                classes
-                    .filter { uClass ->
-                        uClass
-                            .uastSuperTypes
-                            .any { it.getQualifiedName() == "com.genovich.components.Action" } // todo make configurable
-                    }
-                    .map { uClass ->
-                        println(uClass.name)
-                        ActionDefinition(
-                            name = uClass.name ?: "Unknown",
-                        )
-                    }
-                    .associateBy { it.id }
+            LaunchedEffect(currentFile) {
+                val definitions = smartReadAction(project) {
+                    currentFile
+                        ?.toPsiFile(project)
+                        ?.toUElementOfType<UFile>()
+                        ?.classes
+                        .orEmpty()
+                        .filter { uClass ->
+                            uClass
+                                .uastSuperTypes
+                                .any { it.getQualifiedName() == "com.genovich.components.Action" } // todo make configurable
+                        }
+                        .map { uClass ->
+                            println(uClass.name)
+                            ActionDefinition(
+                                name = uClass.name ?: "Unknown",
+                            )
+                        }
+                }
+
+                actions.clear()
+                definitions.forEach { actions[it.id] = it }
+                currentActionId.value = definitions.firstOrNull()?.id
             }
 
-            println(definitions)
 
             App(
-                initial = definitions,
+                actions = actions,
+                currentActionId = currentActionId,
                 onSave = { save(it, project) },
             )
         }

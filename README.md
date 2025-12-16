@@ -264,9 +264,15 @@ calls from a calls that are passing their results to a next function.
 Added arguments passing. Fun to see that the system does exactly what I want, but I don't really
 understand what am I doing: decided that I can just fold Sequential and call functions in place
 without creating an explicit variables to pass the results to the next function, but it leads to a
-part of sequential expression migrates into `repeatWhileActiva` etc. Will not fix it now. Want to do
+part of sequential expression migrates into `repeatWhileActive` etc. Will not fix it now. Want to do
 parsing a code into the diagram first.
 
 Managed to parse classes that are successors to Actions into ActionDefinition structure. Just names,
 but it is a good start. For some reason I don't see any UI at all. However I can see that an
 ActionDefinition is "selected", thus should be shown.
+
+It appears that the problem was with "dumb" mode: I was trying to get a PsiFile and qualified name,
+what is (almost) not possible without "smart" mode. Also I killed two birds with one stone when
+found `smartReadAction()` function that preventing me from reading a file with a wrong locks and
+in "dumb" mode. Next step - restore an ActionDefinition in full. Plus I want to learn how to rewrite
+the current file properly. And add path and package.

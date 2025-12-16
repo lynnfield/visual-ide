@@ -16,13 +16,11 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -159,15 +157,11 @@ fun ActionDefinition.Render(modifier: Modifier = Modifier) {
 @OptIn(ExperimentalTime::class)
 @Composable
 fun App(
-    initial: Map<Uuid, ActionDefinition>,
     onSave: (ActionDefinition) -> Unit,
+    actions: SnapshotStateMap<Uuid, ActionDefinition>,
+    currentActionId: MutableState<Uuid?>,
 ) {
-    val actions = remember(initial) {
-        mutableStateMapOf(*initial.map { (uuid, actionDefinition) -> uuid to actionDefinition }
-            .toTypedArray())
-    }
-    var currentActionId by remember(actions) { mutableStateOf(actions.keys.firstOrNull()) }
-    val currentAction = actions[currentActionId]
+    val currentAction = currentActionId.value?.let { actions[it] }
 
     Box(Modifier.fillMaxSize()) {
         Column(
@@ -182,7 +176,7 @@ fun App(
                             name = mutableStateOf("New action")
                         )
                         actions[action.id] = action
-                        currentActionId = action.id
+                        currentActionId.value = action.id
                     }
                 ) {
                     Text("Nothing to show. Click to add an action.")
