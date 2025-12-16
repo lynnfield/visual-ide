@@ -44,8 +44,10 @@ dependencies {
 //    testImplementation(libs.skikoAwtRuntimeAll)
 
     intellijPlatform {
-//        create(providers.gradleProperty("platformType"), providers.gradleProperty("platformVersion"))
-        intellijIdea("2025.2.1")
+        create(
+            providers.gradleProperty("platformType"),
+            providers.gradleProperty("platformVersion")
+        )
 
         // Compose support dependencies
         bundledModules(

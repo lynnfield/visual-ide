@@ -37,6 +37,8 @@ sealed class ActionLayout : Iterable<ActionLayout> {
     data class RepeatWhileActive(
         val body: MutableState<ActionLayout?> = mutableStateOf(null)
     ) : ActionLayout() {
+        constructor(body: ActionLayout?) : this(mutableStateOf(body))
+
         override fun iterator(): Iterator<ActionLayout> = iterator {
             yield(this@RepeatWhileActive)
             body.value?.also { yieldAll(it) }
@@ -46,6 +48,8 @@ sealed class ActionLayout : Iterable<ActionLayout> {
     data class RetryUntilResult(
         val body: MutableState<ActionLayout?> = mutableStateOf(null)
     ) : ActionLayout() {
+        constructor(body: ActionLayout?) : this(mutableStateOf(body))
+
         override fun iterator(): Iterator<ActionLayout> = iterator {
             yield(this@RetryUntilResult)
             body.value?.also { yieldAll(it) }
@@ -64,6 +68,9 @@ sealed class ActionLayout : Iterable<ActionLayout> {
     data class Action(
         val name: MutableState<String> = mutableStateOf("New Action")
     ) : ActionLayout() {
+
+        constructor(name: String) : this(mutableStateOf(name))
+
         override fun iterator(): Iterator<ActionLayout> = iterator {
             yield(this@Action)
         }

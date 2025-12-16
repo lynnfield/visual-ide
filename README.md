@@ -276,3 +276,9 @@ what is (almost) not possible without "smart" mode. Also I killed two birds with
 found `smartReadAction()` function that preventing me from reading a file with a wrong locks and
 in "dumb" mode. Next step - restore an ActionDefinition in full. Plus I want to learn how to rewrite
 the current file properly. And add path and package.
+
+Trying to parse all the stuff. Was playing a bit with it, but figured it out. Kind of. I'm not that
+happy with how it turns out. Managed to parse everything except Sequential, though. Thinking about
+to wrap Sequential into `run {}` during "rendering". Should be easier to parse and resolve name
+conflicts I think. Tired. Next step - deal with Sequential: read, write with `run {}`, maybe rethink
+variables or remove them completely for now.
