@@ -150,8 +150,6 @@ private const val COM_GENOVICH_COMPONENTS_ACTION = "com.genovich.components.Acti
 
 @OptIn(ExperimentalUuidApi::class)
 fun ActionDefinition.generate(): String {
-    // todo return???
-    // todo inputs in sequential calls
     val actions =
         body.value
             ?.filterIsInstance<ActionLayout.Action>()
@@ -233,16 +231,29 @@ fun UQualifiedReferenceExpression.asRepeatWhileActive(): Result<ActionLayout.Rep
         )
     }
 
-fun ActionLayout.Sequential.generate(input: String): String = body
+fun ActionLayout.Passing.generate(input: String): String = body
     .takeIf { it.isNotEmpty() }
-    ?.fold(input) { exp, layout -> layout.generate(exp) }
+    ?.joinToString(separator = "\n", prefix = "$input\n", postfix = "\n") { layout ->
+        """.let { ${layout.generate("it")} }"""
+    }
     ?: todoStub()
+
+fun UQualifiedReferenceExpression.asPassing(): Result<ActionLayout.Passing> = runCatching {
+    generateSequence(this) { it.receiver as? UQualifiedReferenceExpression }
+        .mapNotNull {
+            ((((it.selector as UCallExpression).valueArguments.single() as ULambdaExpression).body as UBlockExpression).expressions.single() as UReturnExpression).returnExpression?.asActionLayout()
+                ?.getOrThrow()
+        }
+        .toList()
+        .reversed()
+        .let { ActionLayout.Passing(it) }
+}
 
 fun ActionLayout.generate(inputParamName: String): String = when (this) {
     is ActionLayout.Action -> generate(inputParamName)
     is ActionLayout.RepeatWhileActive -> generate(inputParamName)
     is ActionLayout.RetryUntilResult -> generate(inputParamName)
-    is ActionLayout.Sequential -> generate(inputParamName)
+    is ActionLayout.Passing -> generate(inputParamName)
 }
 
 fun UExpression.asActionLayout(): Result<ActionLayout?> = runCatching {
@@ -256,6 +267,7 @@ fun UExpression.asActionLayout(): Result<ActionLayout?> = runCatching {
         is UQualifiedReferenceExpression -> when (tryResolveNamed()?.kotlinFqName) {
             FqName("com.genovich.components.retryUntilResult") -> asRetryUntilResult().getOrThrow()
             FqName("com.genovich.components.repeatWhileActive") -> asRepeatWhileActive().getOrThrow()
+            FqName("kotlin.StandardKt.let") -> asPassing().getOrThrow()
             else -> error("Unsupported qualified reference: ${this.asSourceString()}")
         }
 

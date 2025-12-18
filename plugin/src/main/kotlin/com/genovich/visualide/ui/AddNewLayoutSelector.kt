@@ -12,7 +12,7 @@ private enum class AddNewLayoutSelectorOptions {
     None,
     RepeatWhileActive,
     RetryUntilResult,
-    Sequential,
+    Passing,
     Action,
 }
 
@@ -35,7 +35,7 @@ fun AddNewLayoutSelector(
                 AddNewLayoutSelectorOptions.None -> Unit
                 AddNewLayoutSelectorOptions.RepeatWhileActive -> onAdd(ActionLayout.RepeatWhileActive())
                 AddNewLayoutSelectorOptions.RetryUntilResult -> onAdd(ActionLayout.RetryUntilResult())
-                AddNewLayoutSelectorOptions.Sequential -> onAdd(ActionLayout.Sequential())
+                AddNewLayoutSelectorOptions.Passing -> onAdd(ActionLayout.Passing())
                 AddNewLayoutSelectorOptions.Action -> onAdd(ActionLayout.Action())
             }
         },
@@ -46,7 +46,7 @@ fun AddNewLayoutSelector(
             AddNewLayoutSelectorOptions.None -> Text(buttonText)
             AddNewLayoutSelectorOptions.RepeatWhileActive -> Text("Repeat while active")
             AddNewLayoutSelectorOptions.RetryUntilResult -> Text("Retry until result")
-            AddNewLayoutSelectorOptions.Sequential -> Text("Sequential")
+            AddNewLayoutSelectorOptions.Passing -> Text("Passing")
             AddNewLayoutSelectorOptions.Action -> Text("Action")
         }
     }

@@ -56,11 +56,13 @@ sealed class ActionLayout : Iterable<ActionLayout> {
         }
     }
 
-    data class Sequential(
+    data class Passing(
         val body: SnapshotStateList<ActionLayout> = mutableStateListOf()
     ) : ActionLayout() {
+        constructor(body: List<ActionLayout>) : this(mutableStateListOf(*body.toTypedArray()))
+
         override fun iterator(): Iterator<ActionLayout> = iterator {
-            yield(this@Sequential)
+            yield(this@Passing)
             body.forEach { yieldAll(it) }
         }
     }
@@ -103,7 +105,7 @@ fun ActionLayout.Action.Render(modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun ActionLayout.Sequential.Render(modifier: Modifier = Modifier) {
+fun ActionLayout.Passing.Render(modifier: Modifier = Modifier) {
     Row(
         modifier = modifier.width(IntrinsicSize.Min),
     ) {
@@ -147,7 +149,7 @@ fun ActionLayout.Render(modifier: Modifier = Modifier) = when (this) {
     is ActionLayout.Action -> Render(modifier)
     is ActionLayout.RepeatWhileActive -> Render(modifier)
     is ActionLayout.RetryUntilResult -> Render(modifier)
-    is ActionLayout.Sequential -> Render(modifier)
+    is ActionLayout.Passing -> Render(modifier)
 }
 
 @Composable

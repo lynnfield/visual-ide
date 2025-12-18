@@ -282,3 +282,12 @@ happy with how it turns out. Managed to parse everything except Sequential, thou
 to wrap Sequential into `run {}` during "rendering". Should be easier to parse and resolve name
 conflicts I think. Tired. Next step - deal with Sequential: read, write with `run {}`, maybe rethink
 variables or remove them completely for now.
+
+I found an alternative way to write Sequential: `let {}`! It will allow me to have it all: passing
+style, no problems with variables' naming, and it will be a single expression in the end. So I
+amended the generation part and aiming to write the parser for it. Btw, I think in such
+configuration the better name will be `Passing` rather than `Sequential`.
+I DID IT!!!!! I can successfully generate and parse back the generated Action!!!!! There're so much
+more to do, but I'm here. Need to celebrate somehow. Will write a post to Reddit and TG channel. I
+know, at this point it is shit, but it is the first milestone. I hope this thing will be useful to
+the developers somewhere in the future. Nice job =)
