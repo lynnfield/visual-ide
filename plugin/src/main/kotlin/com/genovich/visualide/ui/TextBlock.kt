@@ -1,40 +1,37 @@
 package com.genovich.visualide.ui
 
-import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
-import androidx.compose.ui.Alignment
+import androidx.compose.ui.Alignment.Companion.TopEnd
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import org.jetbrains.jewel.foundation.theme.JewelTheme
 import org.jetbrains.jewel.ui.component.Text
 
 @Composable
-fun TextBlock(text: MutableState<String>, modifier: Modifier = Modifier.Companion) {
-    TextWithEditor(
-        state = text,
-        modifier = modifier
-            .fillMaxWidth()
-            .heightIn(min = step)
-            .border(Dp.Hairline, JewelTheme.globalColors.borders.normal)
-            .padding(8.dp)
-    )
+fun TextBlock(
+    text: MutableState<String>,
+    onRemove: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
+    ItemBox(modifier) {
+        TextWithEditor(
+            state = text,
+            modifier = Modifier.padding(8.dp),
+        )
+        onRemove?.also { RemoveButton(text.value, onRemove, Modifier.align(TopEnd)) }
+    }
 }
 
 @Composable
-fun TextBlock(text: String, modifier: Modifier = Modifier.Companion) {
-    Box(
-        modifier = modifier
-            .heightIn(min = step)
-            .border(Dp.Hairline, JewelTheme.globalColors.borders.normal),
-        contentAlignment = Alignment.Center,
-    ) {
+fun TextBlock(
+    text: String,
+    onRemove: (() -> Unit)? = null,
+    modifier: Modifier = Modifier,
+) {
+    ItemBox(modifier) {
         Text(
             text = text,
             modifier = Modifier
@@ -42,5 +39,6 @@ fun TextBlock(text: String, modifier: Modifier = Modifier.Companion) {
                 .padding(8.dp),
             textAlign = TextAlign.Center,
         )
+        onRemove?.also { RemoveButton(text, onRemove, Modifier.align(TopEnd)) }
     }
 }

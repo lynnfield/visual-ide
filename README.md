@@ -291,3 +291,33 @@ I DID IT!!!!! I can successfully generate and parse back the generated Action!!!
 more to do, but I'm here. Need to celebrate somehow. Will write a post to Reddit and TG channel. I
 know, at this point it is shit, but it is the first milestone. I hope this thing will be useful to
 the developers somewhere in the future. Nice job =)
+
+Will add a quick feature: removal of an item. I think it should be a cross or bin icon in the top
+right corner or an ActionLayout representation. A click on it will remove the item. Since I'm not
+planing to add a confirmation of such intent, I should think about "undo" action as well. But
+removal first.
+Added "remove" button to all the items except Passing. Mentioned that the diagram didn't reload
+after save in one case after deletion, but cannot reproduce. Also, I think that there should be a
+way to add an item into the beginning and in the middle of Passing. One more thought: can I use
+context menus instead of this ugly dropdown?
+Wow, context menu is the solution! You have to use right button click, but at least it looks better.
+The button is hidden under the remove button though. Will fix now.
+Fixed the button, also added an option to just click + button to open the menu. Wondering if I can
+or even should move to context menus for cleaner UI.
+The remove button in Passing was the whole box wide. Fixed it by removing `propagateMinConstraints`.
+Trying `AllIconsKeys.General.Remove` for deletion icon. Previous one -
+`AllIconsKeys.Actions.DeleteTag` - is OK, look like a cross in a circle, but I want to try one from
+`AllIconsKeys.General` group.
+`AllIconsKeys.General.Remove` appears to be just a minus sign, trying `AllIconsKeys.General.Delete`.
+`AllIconsKeys.General.Delete` is a bin icon, trying `AllIconsKeys.General.Close`.
+`AllIconsKeys.General.Close` is a cross, which is OK, will keep it like this for now, but the UI
+became a bit clogged.
+Will add a way to add an item in the beginning and in the middle of Passing. It is of Passing
+concern, but I just want to do it. Probably avoiding working on assemblies and UI tree.
+Did it. Now I can add items in the middle, nice.
+The last step is "undo". Not sure how to approach it. I'm using states, maybe I'll be able to
+maintain a stack of snapshots or something. It is also possible that there's one already, need to
+check.
+You know what? I'll just leave "undo" for the future, where I'll face this issue. Actually I can
+remove "save" button in order to have continious updates, what will allow me to have undo/redo
+functionality out of the box, probably =)
