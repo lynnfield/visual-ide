@@ -321,3 +321,25 @@ check.
 You know what? I'll just leave "undo" for the future, where I'll face this issue. Actually I can
 remove "save" button in order to have continious updates, what will allow me to have undo/redo
 functionality out of the box, probably =)
+
+One more thing that is bothering me: `ActionLayout.Render`, `ActionLayout.generate()` and
+`UExpression.asActionLayout()` extensions. They are good candidates for polymorphism and I think
+I'll move them to the appropriate classes. However, moving the `UExpression` parsing will be tough.
+Let's start with `Render`.
+`Render` is done. I mentioned that it is a bit different on `ActionDefinition`, but I'm OK with it
+now.
+The next one is `ActionLayout.generate()`. The file became a bit chunky, but I hope that I'll be
+able to split `ActionLayout` into separate files.
+Done with `ActionLayout.generate()`, now to the complex part - parsing.
+So I think I'll need to normalise them all to extensions of `UExpression` first. Then I'll check for
+the conditions needed. If any of the check will not pass, I'll throw an error and on the top level.
+Then I'll just iteratively pass through all the checks (or in parallel), and see if there's any
+result, then I'll return it or throw a combined exception.
+Normalised everything including the polymorphic function. Will try to move them.
+Moved all the methods and all the classes. This part is done and probably will allow me to
+establish plugin system for ActionLayouts later (still not sure how). Done and done, time to sleep.
+Ahaha, I forgot to run it and check correctness. It is not working. Will do it tomorrow. The good
+thing is that now I have an opportunity to check if error messages are good.
+Lol, was too tired, copied a part from `retryUntilResult` parsing to `Passing` and was checking for
+a wrong method name. Now everything works. Thus, I cannot avoid assemblies and UI generation and
+rendering any more. Good luck to me.

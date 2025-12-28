@@ -8,12 +8,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import com.genovich.visualide.ui.ActionDefinition
-import com.genovich.visualide.ui.ActionLayout
+import com.genovich.visualide.actions.ActionDefinition
 import com.genovich.visualide.ui.App
 import com.intellij.openapi.application.smartReadAction
 import com.intellij.openapi.command.WriteCommandAction
-import com.intellij.openapi.diagnostic.getOrLogException
 import com.intellij.openapi.fileEditor.FileEditorManager
 import com.intellij.openapi.fileEditor.FileEditorManagerEvent
 import com.intellij.openapi.fileEditor.FileEditorManagerListener
@@ -27,27 +25,14 @@ import com.intellij.psi.PsiDocumentManager
 import com.intellij.psi.PsiFile
 import com.intellij.psi.PsiManager
 import com.intellij.psi.codeStyle.CodeStyleManager
-import com.intellij.util.asSafely
 import com.intellij.util.messages.impl.subscribeAsFlow
 import kotlinx.coroutines.flow.map
 import org.jetbrains.jewel.bridge.addComposeTab
-import org.jetbrains.kotlin.idea.base.psi.kotlinFqName
 import org.jetbrains.kotlin.idea.core.util.toPsiFile
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.psi.KtPsiFactory
-import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstanceOrNull
-import org.jetbrains.kotlin.utils.findIsInstanceAnd
-import org.jetbrains.uast.UBlockExpression
-import org.jetbrains.uast.UCallExpression
-import org.jetbrains.uast.UClass
-import org.jetbrains.uast.UExpression
 import org.jetbrains.uast.UFile
-import org.jetbrains.uast.ULambdaExpression
-import org.jetbrains.uast.UMethod
-import org.jetbrains.uast.UQualifiedReferenceExpression
-import org.jetbrains.uast.UReturnExpression
 import org.jetbrains.uast.toUElementOfType
-import org.jetbrains.uast.tryResolveNamed
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -80,7 +65,7 @@ class VisualIdeToolWindowFactory : ToolWindowFactory, DumbAware {
                         ?.toUElementOfType<UFile>()
                         ?.classes
                         .orEmpty()
-                        .mapNotNull(UClass::asActionDefinition)
+                        .mapNotNull { ActionDefinition.parse(it) }
                 }
 
                 actions.clear()
@@ -144,135 +129,3 @@ private fun save(actionDefinition: ActionDefinition, project: Project) {
         } ?: println("File not found $file")
     }
 }
-
-private const val INVOKE_METHOD_NAME = "invoke"
-private const val COM_GENOVICH_COMPONENTS_ACTION = "com.genovich.components.Action"
-
-@OptIn(ExperimentalUuidApi::class)
-fun ActionDefinition.generate(): String {
-    val actions =
-        body.value
-            ?.filterIsInstance<ActionLayout.Action>()
-            ?.distinctBy { it.name.value }
-            ?.joinToString(separator = "", prefix = "\n") {
-                "val `${it.name.value}`: $COM_GENOVICH_COMPONENTS_ACTION<Input, Output>,\n"
-            }
-            .orEmpty()
-
-    val input = "input"
-    return """
-        class `${name.value}`<Input, Output>($actions) : $COM_GENOVICH_COMPONENTS_ACTION<Input, Output>() {
-            override suspend operator fun $INVOKE_METHOD_NAME($input: Input): Output =
-                ${(body.value?.generate(input) ?: todoStub())}
-        }
-    """.trimIndent()
-}
-
-private fun UClass.asActionDefinition(): ActionDefinition? =
-    takeIf {
-        uastSuperTypes.any { it.getQualifiedName() == COM_GENOVICH_COMPONENTS_ACTION }
-    }?.let {
-        ActionDefinition(
-            name = name ?: "Unknown",
-            body = uastDeclarations
-                .findIsInstanceAnd<UMethod> { it.name == INVOKE_METHOD_NAME }
-                ?.uastBody
-                ?.asSafely<UBlockExpression>()
-                ?.expressions
-                ?.firstIsInstanceOrNull<UReturnExpression>()
-                ?.returnExpression
-                ?.asActionLayout()
-                ?.getOrLogException { it.printStackTrace() },
-        )
-    }
-
-fun ActionLayout.Action.generate(input: String): String = "`${name.value}`($input)"
-
-fun UCallExpression.asAction(): Result<ActionLayout.Action> = runCatching {
-    ActionLayout.Action(checkNotNull(receiver?.tryResolveNamed()?.name) { "Missing action name" })
-}
-
-fun ActionLayout.RetryUntilResult.generate(input: String): String = """
-    com.genovich.components.retryUntilResult {
-        ${(body.value?.generate(input) ?: todoStub())}
-    }
-""".trimIndent()
-
-fun UQualifiedReferenceExpression.asRetryUntilResult(): Result<ActionLayout.RetryUntilResult> =
-    runCatching {
-        ActionLayout.RetryUntilResult(
-            ((((selector as UCallExpression)
-                .valueArguments.single() as ULambdaExpression)
-                .body as UBlockExpression)
-                .expressions.single() as UReturnExpression)
-                .returnExpression
-                ?.asActionLayout()
-                ?.getOrThrow()
-        )
-    }
-
-
-fun ActionLayout.RepeatWhileActive.generate(input: String): String = """
-    com.genovich.components.repeatWhileActive {
-        ${(body.value?.generate(input) ?: todoStub())}
-    }
-""".trimIndent()
-
-fun UQualifiedReferenceExpression.asRepeatWhileActive(): Result<ActionLayout.RepeatWhileActive> =
-    runCatching {
-        ActionLayout.RepeatWhileActive(
-            ((((selector as UCallExpression)
-                .valueArguments.single() as ULambdaExpression)
-                .body as UBlockExpression)
-                .expressions.single() as UReturnExpression)
-                .returnExpression
-                ?.asActionLayout()
-                ?.getOrThrow()
-        )
-    }
-
-fun ActionLayout.Passing.generate(input: String): String = body
-    .takeIf { it.isNotEmpty() }
-    ?.joinToString(separator = "\n", prefix = "$input\n", postfix = "\n") { layout ->
-        """.let { ${layout.generate("it")} }"""
-    }
-    ?: todoStub()
-
-fun UQualifiedReferenceExpression.asPassing(): Result<ActionLayout.Passing> = runCatching {
-    generateSequence(this) { it.receiver as? UQualifiedReferenceExpression }
-        .mapNotNull {
-            ((((it.selector as UCallExpression).valueArguments.single() as ULambdaExpression).body as UBlockExpression).expressions.single() as UReturnExpression).returnExpression?.asActionLayout()
-                ?.getOrThrow()
-        }
-        .toList()
-        .reversed()
-        .let { ActionLayout.Passing(it) }
-}
-
-fun ActionLayout.generate(inputParamName: String): String = when (this) {
-    is ActionLayout.Action -> generate(inputParamName)
-    is ActionLayout.RepeatWhileActive -> generate(inputParamName)
-    is ActionLayout.RetryUntilResult -> generate(inputParamName)
-    is ActionLayout.Passing -> generate(inputParamName)
-}
-
-fun UExpression.asActionLayout(): Result<ActionLayout?> = runCatching {
-    when (this) {
-        is UCallExpression -> when (methodName) {
-            "invoke" -> asAction().getOrThrow()
-            "TODO" -> null
-            else -> error("Unsupported call expression: ${this.asSourceString()}")
-        }
-
-        is UQualifiedReferenceExpression -> when (tryResolveNamed()?.kotlinFqName) {
-            FqName("com.genovich.components.retryUntilResult") -> asRetryUntilResult().getOrThrow()
-            FqName("com.genovich.components.repeatWhileActive") -> asRepeatWhileActive().getOrThrow()
-            FqName("kotlin.StandardKt.let") -> asPassing().getOrThrow()
-            else -> error("Unsupported qualified reference: ${this.asSourceString()}")
-        }
-
-        else -> error("Unsupported expression type: ${this::class}")
-    }
-}.recoverCatching { throw Exception("while parsing ${asSourceString()}", it) }
-
-fun todoStub(): String = """TODO("implement body")"""
