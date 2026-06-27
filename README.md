@@ -319,7 +319,7 @@ The last step is "undo". Not sure how to approach it. I'm using states, maybe I'
 maintain a stack of snapshots or something. It is also possible that there's one already, need to
 check.
 You know what? I'll just leave "undo" for the future, where I'll face this issue. Actually I can
-remove "save" button in order to have continious updates, what will allow me to have undo/redo
+remove "save" button in order to have continuous updates, what will allow me to have undo/redo
 functionality out of the box, probably =)
 
 One more thing that is bothering me: `ActionLayout.Render`, `ActionLayout.generate()` and
@@ -343,3 +343,12 @@ thing is that now I have an opportunity to check if error messages are good.
 Lol, was too tired, copied a part from `retryUntilResult` parsing to `Passing` and was checking for
 a wrong method name. Now everything works. Thus, I cannot avoid assemblies and UI generation and
 rendering any more. Good luck to me.
+
+What's an Assembly? It is a secondary constructor for an Action, but tied up to exact dependencies
+that the Action needs, while propagating up everything that cannot be created.
+This means that an Assembly for an Action in a vacuum will be equivalent to the Action's
+constructor. However, in a presence of dependencies it should instantiate them. Complicated?
+Should I start with adding a way to create new Actions in place when defining current selected
+Action? I could, but it'll be not parsable as I'll not be able to decide on the exact dependencies.
+So let's try to generate an Assembly first, then parse it, and then proceed with in-place Actions
+creation. 

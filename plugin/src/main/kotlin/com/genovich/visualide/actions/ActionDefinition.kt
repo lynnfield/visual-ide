@@ -72,7 +72,7 @@ data class ActionDefinition(
         const val INVOKE_METHOD_NAME = "invoke"
         const val COM_GENOVICH_COMPONENTS_ACTION = "com.genovich.components.Action"
 
-        fun parse(uClass: UClass) =
+        fun parse(uClass: UClass): ActionDefinition? =
             uClass
                 .takeIf {
                     it.uastSuperTypes.any { it.getQualifiedName() == COM_GENOVICH_COMPONENTS_ACTION }

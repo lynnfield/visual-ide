@@ -89,13 +89,15 @@ private fun save(actionDefinition: ActionDefinition, project: Project) {
     // todo make configurable
     val dir = "src/main/kotlin"
     val actionsPackage = FqName("com.example")
+    val assembliesPackage = actionsPackage
 
-    val fileName = "${actionDefinition.name.value}.kt"
-    val psiFile = psiElementFactory.createFile(fileName, "")
+    val actionFileName = "${actionDefinition.name.value}.kt"
+    val actionPsiFile = psiElementFactory.createFile(actionFileName, "")
+    val assemblyFileName = "$"
 
-    psiElementFactory.createPackageDirectiveIfNeeded(actionsPackage)
-    psiFile.add(psiElementFactory.createNewLine())
-    psiFile.add(psiElementFactory.createClass(actionDefinition.generate()))
+    actionPsiFile.add(psiElementFactory.createPackageDirective(actionsPackage))
+    actionPsiFile.add(psiElementFactory.createNewLine())
+    actionPsiFile.add(psiElementFactory.createClass(actionDefinition.generate()))
 
     // 1. EXECUTE WRITE ACTION (Required for modifying the project)
     WriteCommandAction.runWriteCommandAction(project) {
@@ -115,8 +117,8 @@ private fun save(actionDefinition: ActionDefinition, project: Project) {
             }
 
         // find and rewrite or create a new file
-        targetDirectory.findFile(psiFile.name)?.delete()
-        val file = targetDirectory.add(psiFile) as PsiFile
+        targetDirectory.findFile(actionPsiFile.name)?.delete()
+        val file = targetDirectory.add(actionPsiFile) as PsiFile
 
         // have to commit the document before reformatting
         PsiDocumentManager.getInstance(project).commitDocument(file.fileDocument)
