@@ -542,6 +542,93 @@ layout (§2.7); whether it is shared in the document or kept per-user is left to
 
 ---
 
+## 6. End-to-end example: plan & hypotheses
+
+A worked example that carries one function from diagram to generated code and back, built on a
+**synthetic specimen** (not the `sms-virtual-core` app) so it is unconstrained by an existing
+codebase. The specimen is designed to *grow with the work*: rung 0 uses only the node types the
+plugin already implements, and each later rung adds exactly one capability.
+
+### 6.1 Reuse of the existing plugin
+
+The `plugin` module already implements a working per-node round-trip for a subset of the model
+(see the mapping in the project notes): `ActionLayout` = a self-rendering / self-generating /
+self-parsing node; `Action` = port-call leaf; `Passing` = Sequence (a linear `.let{}` pipe);
+`RepeatWhileActive` = Loop; `RetryUntilResult` = decorator; `ActionDefinition` = the function
+file, already auto-deriving dependency ports from the called `Action`s (§4.2). Parsing is UAST
+(K2), generation is string + `CodeStyleManager` reformat. **Gaps:** assembly generation is
+stubbed; no real types, annotations/checksum, value-plumbing nodes, Branch/Parallel/`Try`, or
+T-function; UAST leaks into the node parsers (the `KotlinAnalysis` boundary of D12 is not yet
+interposed).
+
+### 6.2 The specimen: guess-the-number
+
+Domain types: `Guess`, `Secret`, and `sealed interface Comparison { TooLow; TooHigh; Correct }`.
+
+**Rung 0 (round-trips today):** a loop over a two-step pipeline of leaf calls —
+`RepeatWhileActive(Passing[readGuess, checkGuess])`:
+
+```kotlin
+class GuessLoop(
+    val readGuess: Action<Unit, Unit>,   // leaf port (types loose on purpose)
+    val checkGuess: Action<Unit, Unit>,
+) : Action<Unit, Nothing>() {
+    override suspend fun invoke(input: Unit): Nothing =
+        repeatWhileActive { input.let { readGuess(it) }.let { checkGuess(it) } }
+}
+```
+
+**Target (rung 5):** a real round, looped until `Correct`:
+
+```kotlin
+askGuess  : Action<Secret, Guess>                 // T-function (Show)
+compare   : Action<Pair<Secret, Guess>, Comparison>  // leaf; input via a Tuple node
+showResult: Action<Comparison, Unit>              // T-function (Show)
+// PlayRound: ask → compare(secret to guess) → showResult(result) → result
+// Game: loop PlayRound, Branch on Comparison (TooLow/TooHigh → loop, Correct → exit)
+```
+
+### 6.3 The ladder
+
+0. **Harness + `GuessLoop`** — round-trip on the current engine (Loop + Passing + leaves).
+1. **Real types** — replace the placeholder `<Input,Output>` with inferred per-port types
+   (`Unit`/`Guess`/`Comparison`/`Secret`); compile the generated function.
+2. **Second file** — generate `…Assembly` (default wiring + decoration) and the derived
+   `UiStateFlow` (the two `Show`s become projection leaves); compile.
+3. **Integrity** — emit `@Node`/`@Diagram` + checksum; verify stability + drift detection.
+4. **Decouple** — interpose the engine's own IR between UAST and the nodes (validate D12).
+5. **Climb** — add the **Tuple** node (`secret to guess`), the **Branch** node (sealed
+   `Comparison`), and the **T-function** (`Show`-bound `askGuess`/`showResult`); optional
+   **Parallel** rung (a timeout racing the guess).
+
+### 6.4 Hypotheses (each rung falsifies one)
+
+- **H1 — Round-trip idempotence:** parse→generate→parse reaches a fixed point; generate is
+  byte-stable after normalization. *(Rung 0)*
+- **H2 — Port derivation + typing:** auto-collected ports yield a *compilable* function.
+  *Prediction: generic `<Input,Output>` fails for real multi-typed ports → type inference (D10)
+  is required.* *(Rung 1)*
+- **H3 — Two-file derivability:** assembly + `UiStateFlow` projection are mechanically generable
+  from the same diagram (§3.2–§3.3). *(Rung 2)*
+- **H4 — Canonical form/checksum stability:** a normal form exists whose checksum is stable
+  across regenerate cycles. *(Rung 3)*
+- **H5 — Host decoupling:** an engine IR can sit between UAST and the model without breaking
+  round-trip. *(Rung 4)*
+- **H6 — No-opaque-text value plumbing:** a real body with Tuple/Construct/Branch round-trips
+  with named `val`s. *Prediction: `Passing`-as-pipe is insufficient — named SSA `val`s (§2.7) are
+  needed.* *(Rung 5)*
+- **H7 — T-function + projection:** a `Show`-bound port renders as a T and derives a
+  `UiStateFlow` leaf. *(Rung 5)*
+
+### 6.5 Harness
+
+A platform test (`TestFrameworkType.Platform`, already wired) that adds the specimen `.kt` to a
+fixture, runs `ActionDefinition.parse` → `generate` → re-parse, and asserts a fixed point. The
+fixture must make `com.genovich.components` **resolvable** (UAST parsing resolves FqNames), so the
+specimen bundles **minimal `components` stubs** rather than depending on the published library.
+
+---
+
 ## Decisions log
 
 - **D1 — Multiple inputs:** A block keeps a single `Input`. Several inputs are modeled as one
@@ -597,12 +684,11 @@ layout (§2.7); whether it is shared in the document or kept per-user is left to
 
 ## Remaining open items & next steps
 
-Sections §1–§5 are drafted. Outstanding items:
+Sections §1–§6 are drafted. Outstanding items:
 
 - **Canvas frontend** (§4.5): undecided; a portable web frontend is one option, not yet pinned.
 - **D5 revisit** — override seams, once diagram-based re-wiring exists (§3.7).
-- **Not yet written** — an implementation roadmap / milestone plan (engine first, then the
-  IntelliJ host adapters and canvas), and a worked end-to-end example carrying one function from
-  diagram to generated `fn:`/`asm:` modules and back.
+- **Execute the §6 ladder** — build rung 0 (harness + `GuessLoop` round-trip) and climb, testing
+  H1–H7. Findings feed back into the decisions above.
 ```
 
