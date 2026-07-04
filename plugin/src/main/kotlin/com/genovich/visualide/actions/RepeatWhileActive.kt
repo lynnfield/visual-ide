@@ -21,6 +21,8 @@ import org.jetbrains.uast.UQualifiedReferenceExpression
 import org.jetbrains.uast.UReturnExpression
 import org.jetbrains.uast.tryResolveNamed
 
+private const val REPEAT_WHILE_ACTIVE_FQN = """com.genovich.components.repeatWhileActive"""
+
 data class RepeatWhileActive(
     val body: MutableState<ActionLayout?> = mutableStateOf(null)
 ) : ActionLayout {
@@ -47,7 +49,7 @@ data class RepeatWhileActive(
     }
 
     override fun generate(input: String): String = """
-        com.genovich.components.repeatWhileActive {
+        $REPEAT_WHILE_ACTIVE_FQN {
             ${(body.value?.generate(input) ?: TodoStub.generate())}
         }
     """.trimIndent()
@@ -58,7 +60,7 @@ data class RepeatWhileActive(
                 .also {
                     checkNotNull(it.tryResolveNamed()) { "failed to resolve named element" }
                         .let { checkNotNull(it.kotlinFqName) { "expression should have a kotlin fully qualified name" } }
-                        .also { check(FqName("com.genovich.components.repeatWhileActive") == it) { "name should be com.genovich.components.retryUntilResult" } }
+                        .also { check(FqName("$REPEAT_WHILE_ACTIVE_FQN") == it) { "name should be $REPEAT_WHILE_ACTIVE_FQN" } }
                 }
                 .let { checkNotNull(it.selector as? UCallExpression) { "selector should be a call expression" } }
                 .valueArguments
