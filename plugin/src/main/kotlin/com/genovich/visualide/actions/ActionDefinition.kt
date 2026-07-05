@@ -50,19 +50,29 @@ data class ActionDefinition(
 
     @OptIn(ExperimentalUuidApi::class)
     fun generate(): String {
-        val actions =
-            body.value
-                ?.filterIsInstance<Action>()
-                ?.distinctBy { it.name.value }
-                ?.joinToString(separator = "", prefix = "\n") {
-                    "val `${it.name.value}`: $COM_GENOVICH_COMPONENTS_ACTION<Input, Output>,\n"
+        // Structural type inference (rung 1 / H2): thread type variables through the body so each
+        // port gets its own Action<in, out> types instead of a shared placeholder <Input, Output>.
+        val ports = mutableMapOf<String, Pair<String, String>>()
+        var typeVarCount = 0
+        val fresh = { "T${++typeVarCount}" }
+        val output = body.value?.inferType(INPUT_TYPE, fresh, ports) ?: NOTHING_TYPE
+
+        val typeParameters =
+            (listOf(INPUT_TYPE) + (1..typeVarCount).map { "T$it" }).joinToString(separator = ", ")
+
+        val portDeclarations =
+            if (ports.isEmpty()) {
+                ""
+            } else {
+                ports.entries.joinToString(separator = ",\n", prefix = "\n") { (portName, io) ->
+                    "val `$portName`: $COM_GENOVICH_COMPONENTS_ACTION<${io.first}, ${io.second}>"
                 }
-                .orEmpty()
+            }
 
         val input = "input"
         return """
-            class `${name.value}`<Input, Output>($actions) : $COM_GENOVICH_COMPONENTS_ACTION<Input, Output>() {
-                override suspend operator fun $INVOKE_METHOD_NAME($input: Input): Output =
+            class `${name.value}`<$typeParameters>($portDeclarations) : $COM_GENOVICH_COMPONENTS_ACTION<$INPUT_TYPE, $output>() {
+                override suspend operator fun $INVOKE_METHOD_NAME($input: $INPUT_TYPE): $output =
                     ${(body.value?.generate(input) ?: TodoStub.generate())}
             }
         """.trimIndent()
@@ -71,6 +81,8 @@ data class ActionDefinition(
     companion object {
         const val INVOKE_METHOD_NAME = "invoke"
         const val COM_GENOVICH_COMPONENTS_ACTION = "com.genovich.components.Action"
+        const val INPUT_TYPE = "Input"
+        const val NOTHING_TYPE = "Nothing"
 
         fun parse(uClass: UClass): ActionDefinition? =
             uClass

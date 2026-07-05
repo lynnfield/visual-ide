@@ -54,6 +54,16 @@ data class RepeatWhileActive(
         }
     """.trimIndent()
 
+    override fun inferType(
+        input: String,
+        fresh: () -> String,
+        ports: MutableMap<String, Pair<String, String>>,
+    ): String {
+        // The loop threads its input into the body each iteration and never returns normally.
+        body.value?.inferType(input, fresh, ports)
+        return "Nothing"
+    }
+
     companion object : ActionLayout.UExpressionParser<RepeatWhileActive> {
         override fun parse(expression: UExpression): Result<RepeatWhileActive> = runCatching {
             checkNotNull(expression as? UQualifiedReferenceExpression) { "not a qualified reference expression" }

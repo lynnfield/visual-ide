@@ -15,6 +15,18 @@ interface ActionLayout : Iterable<ActionLayout> {
 
     fun generate(input: String): String
 
+    /**
+     * Structural type inference (design doc rung 1 / H2). Given the [input] type expression,
+     * returns this node's output type expression, recording each leaf port's `<in, out>` types
+     * into [ports] (keyed by port name; first occurrence wins). [fresh] mints unique
+     * type-variable names.
+     */
+    fun inferType(
+        input: String,
+        fresh: () -> String,
+        ports: MutableMap<String, Pair<String, String>>,
+    ): String
+
     fun interface UExpressionParser<out T : ActionLayout?> {
         fun parse(expression: UExpression): Result<T>
     }

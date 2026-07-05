@@ -29,14 +29,21 @@ class GuessLoopGenerateTest {
 
         val code = definition.generate()
 
-        assertTrue("declares the class", code.contains("class `GuessLoop`<Input, Output>"))
         assertTrue(
-            "derives the readGuess port",
-            code.contains("val `readGuess`: com.genovich.components.Action<Input, Output>"),
+            "declares threaded type parameters",
+            code.contains("class `GuessLoop`<Input, T1, T2>"),
         )
         assertTrue(
-            "derives the checkGuess port",
-            code.contains("val `checkGuess`: com.genovich.components.Action<Input, Output>"),
+            "types the readGuess port",
+            code.contains("val `readGuess`: com.genovich.components.Action<Input, T1>"),
+        )
+        assertTrue(
+            "types the checkGuess port",
+            code.contains("val `checkGuess`: com.genovich.components.Action<T1, T2>"),
+        )
+        assertTrue(
+            "the loop's output type is Nothing",
+            code.contains(": com.genovich.components.Action<Input, Nothing>"),
         )
         assertTrue("emits the loop", code.contains("com.genovich.components.repeatWhileActive"))
         assertTrue("pipes readGuess", code.contains(".let { `readGuess`(it) }"))

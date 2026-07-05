@@ -56,6 +56,12 @@ data class Passing(
         }
         ?: TodoStub.generate()
 
+    override fun inferType(
+        input: String,
+        fresh: () -> String,
+        ports: MutableMap<String, Pair<String, String>>,
+    ): String = body.fold(input) { accumulated, layout -> layout.inferType(accumulated, fresh, ports) }
+
     companion object : ActionLayout.UExpressionParser<Passing> {
         override fun parse(expression: UExpression): Result<Passing> = runCatching {
             checkNotNull(expression as? UQualifiedReferenceExpression) { "not a qualified reference expression" }

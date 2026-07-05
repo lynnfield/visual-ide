@@ -26,6 +26,14 @@ data class Action(
 
     override fun generate(input: String): String = "`${name.value}`($input)"
 
+    override fun inferType(
+        input: String,
+        fresh: () -> String,
+        ports: MutableMap<String, Pair<String, String>>,
+    ): String {
+        return ports.getOrPut(name.value) { input to fresh() }.second
+    }
+
     companion object : ActionLayout.UExpressionParser<Action> {
         override fun parse(expression: UExpression): Result<Action> = runCatching {
             checkNotNull(expression as? UCallExpression) { "is not a call expression" }

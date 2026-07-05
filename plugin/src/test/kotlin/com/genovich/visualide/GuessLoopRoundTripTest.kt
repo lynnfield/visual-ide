@@ -36,9 +36,10 @@ import kotlin.uuid.ExperimentalUuidApi
  *             }
  *     }
  *
- * Validates H1: `generate ∘ parse ∘ generate` is a fixed point and the model survives the
- * round-trip. Types are deliberately loose (everything `<Input, Output>`); real per-port typing
- * is rung 1 / H2, so the generated code is not expected to *type-check* yet — only to parse.
+ * Validates H1 (`generate ∘ parse ∘ generate` is a fixed point) and, after rung 1, H2 (the typed
+ * generation type-checks — see [testGuessLoopTypeChecks]). Per-port types are threaded
+ * structurally: `GuessLoop<Input, T1, T2>`, ports `Action<Input, T1>` / `Action<T1, T2>`, output
+ * `Nothing`.
  */
 @OptIn(ExperimentalUuidApi::class)
 class GuessLoopRoundTripTest : BasePlatformTestCase() {
@@ -78,6 +79,24 @@ class GuessLoopRoundTripTest : BasePlatformTestCase() {
             listOf("readGuess", "checkGuess"),
             passing!!.body.filterIsInstance<Action>().map { it.name.value },
         )
+    }
+
+    fun testGuessLoopTypeChecks() {
+        // H2: typed generation must produce code that actually type-checks (no error highlights),
+        // not merely parse. Rung 0's shared <Input, Output> would fail here (Output fed where Input
+        // is expected); the threaded per-port types fix it.
+        myFixture.copyFileToProject("specimen/Components.kt", "com/genovich/components/Components.kt")
+
+        val definition = ActionDefinition(
+            name = "GuessLoop",
+            body = RepeatWhileActive(
+                Passing(listOf(Action("readGuess"), Action("checkGuess"))),
+            ),
+        )
+
+        myFixture.configureByText("GuessLoop.kt", "package specimen\n\n${definition.generate()}\n")
+        // errors only (no warnings/infos); fails listing any type error.
+        myFixture.checkHighlighting(false, false, false)
     }
 
     private fun fileFor(generatedClass: String): String =

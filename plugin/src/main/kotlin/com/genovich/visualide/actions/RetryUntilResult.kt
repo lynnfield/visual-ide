@@ -52,6 +52,12 @@ data class RetryUntilResult(
         }
     """.trimIndent()
 
+    override fun inferType(
+        input: String,
+        fresh: () -> String,
+        ports: MutableMap<String, Pair<String, String>>,
+    ): String = body.value?.inferType(input, fresh, ports) ?: "Nothing"
+
     companion object : ActionLayout.UExpressionParser<RetryUntilResult> {
         override fun parse(expression: UExpression): Result<RetryUntilResult> = runCatching {
             ActionLayout.parse(checkNotNull(expression as? UQualifiedReferenceExpression) { "not a qualified reference expression" }
