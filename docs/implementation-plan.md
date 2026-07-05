@@ -10,13 +10,17 @@ architecture and what "done" means for the earlier rungs.
   `generate ∘ parse ∘ generate` is a fixed point (H1). Green.
 - **Rung 1 (done)** — structural per-port typing via `ActionLayout.inferType`; generated function
   type-checks (H2). Green.
+- **Rung 2 / Step 1 (done)** — assembly file generation (`ActionDefinition.generateAssembly()`);
+  `save()` emits both `<Name>.kt` and `<Name>Assembly.kt`. Validates the *wiring* half of H3. See
+  `docs/example-rung2.md`. `parseAssembly` (the round-trip stretch goal) and Step 2's
+  `UiStateFlow`/T-function projection are still open.
 
 The engine lives in `plugin/src/main/kotlin/com/genovich/visualide/actions/`:
 `ActionLayout` (node interface: `Render` / `generate` / `inferType` / `parse`), the nodes
 (`Action`, `Passing`, `RepeatWhileActive`, `RetryUntilResult`, `TodoStub`), and `ActionDefinition`
-(the function file: `generate()` + `parse(UClass)`). The tool window's `save()`
-(`toolWindow/VisualIdeToolWindowFactory.kt`) currently writes only the function file — assembly
-generation is stubbed (`assemblyFileName = "$"`).
+(the function file: `signature()` + `generate()` + `generateAssembly()` + `parse(UClass)`). The
+tool window's `save()` (`toolWindow/VisualIdeToolWindowFactory.kt`) writes both the function file
+and its assembly.
 
 ## Conventions any new work MUST follow
 
@@ -39,10 +43,18 @@ generation is stubbed (`assemblyFileName = "$"`).
 
 ---
 
-## Step 1 — Assembly file generation (Rung 2, H3 wiring)
+## Step 1 — Assembly file generation (Rung 2, H3 wiring) — done
 
 **Goal.** Generate the `<Name>Assembly` factory (dependency-plane) alongside the function file,
 and emit both from `save()`.
+
+**Note (as implemented).** Kotlin function type parameters go *before* the name
+(`fun <Input, T1, T2> \`GuessLoopAssembly\`(...)`), not after like a class — the snippet below
+predates that correction. The decorator-wrapping bullet turned out not to apply to the current
+node model: `RetryUntilResult` already embeds `retryUntilResult { }` inside the class's own
+`invoke()` (see `RetryUntilResult.generate`), so when it's the top-level body node the class
+itself already does the decorating — `generateAssembly()` stays uniform (construct ports, call
+the constructor) with no special case. `parseAssembly` (the stretch goal) was not implemented.
 
 **Tasks.**
 - Extract a shared `signature()` helper on `ActionDefinition` that runs the `inferType` pass once

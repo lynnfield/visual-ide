@@ -48,41 +48,89 @@ data class ActionDefinition(
         }
     }
 
-    @OptIn(ExperimentalUuidApi::class)
-    fun generate(): String {
-        // Structural type inference (rung 1 / H2): thread type variables through the body so each
-        // port gets its own Action<in, out> types instead of a shared placeholder <Input, Output>.
+    /**
+     * Structural type inference (rung 1 / H2), run once and shared by [generate] and
+     * [generateAssembly]: threads type variables through the body so each port gets its own
+     * `Action<in, out>` types instead of a shared placeholder `<Input, Output>`.
+     */
+    fun signature(): Signature {
         val ports = mutableMapOf<String, Pair<String, String>>()
         var typeVarCount = 0
         val fresh = { "T${++typeVarCount}" }
-        val output = body.value?.inferType(INPUT_TYPE, fresh, ports) ?: NOTHING_TYPE
+        val outputType = body.value?.inferType(INPUT_TYPE, fresh, ports) ?: NOTHING_TYPE
+        val typeParameters = listOf(INPUT_TYPE) + (1..typeVarCount).map { "T$it" }
+        return Signature(typeParameters, ports, outputType)
+    }
 
-        val typeParameters =
-            (listOf(INPUT_TYPE) + (1..typeVarCount).map { "T$it" }).joinToString(separator = ", ")
+    @OptIn(ExperimentalUuidApi::class)
+    fun generate(): String {
+        val signature = signature()
+        val typeParameters = signature.typeParameters.joinToString(separator = ", ")
 
         val portDeclarations =
-            if (ports.isEmpty()) {
+            if (signature.ports.isEmpty()) {
                 ""
             } else {
-                ports.entries.joinToString(separator = ",\n", prefix = "\n") { (portName, io) ->
+                signature.ports.entries.joinToString(separator = ",\n", prefix = "\n") { (portName, io) ->
                     "val `$portName`: $COM_GENOVICH_COMPONENTS_ACTION<${io.first}, ${io.second}>"
                 }
             }
 
         val input = "input"
         return """
-            class `${name.value}`<$typeParameters>($portDeclarations) : $COM_GENOVICH_COMPONENTS_ACTION<$INPUT_TYPE, $output>() {
-                override suspend operator fun $INVOKE_METHOD_NAME($input: $INPUT_TYPE): $output =
+            class `${name.value}`<$typeParameters>($portDeclarations) : $COM_GENOVICH_COMPONENTS_ACTION<$INPUT_TYPE, ${signature.outputType}>() {
+                override suspend operator fun $INVOKE_METHOD_NAME($input: $INPUT_TYPE): ${signature.outputType} =
                     ${(body.value?.generate(input) ?: TodoStub.generate())}
             }
         """.trimIndent()
     }
+
+    /**
+     * The dependency-plane factory (design.md §3.2): a function taking every leaf port as a
+     * required parameter and constructing this definition's class. No default wiring yet (that
+     * arrives with child assemblies / T-functions in later rungs), so every port is required.
+     */
+    fun generateAssembly(): String {
+        val signature = signature()
+        val typeParameters = signature.typeParameters.joinToString(separator = ", ")
+
+        val parameterDeclarations =
+            if (signature.ports.isEmpty()) {
+                ""
+            } else {
+                signature.ports.entries.joinToString(separator = ",\n", prefix = "\n", postfix = ",\n") { (portName, io) ->
+                    "    `$portName`: $COM_GENOVICH_COMPONENTS_ACTION<${io.first}, ${io.second}>"
+                }
+            }
+
+        val constructorArguments =
+            if (signature.ports.isEmpty()) {
+                ""
+            } else {
+                signature.ports.keys.joinToString(separator = ",\n", prefix = "\n", postfix = ",\n") { portName ->
+                    "    `$portName` = `$portName`"
+                }
+            }
+
+        return """
+            fun <$typeParameters> `${name.value}$ASSEMBLY_SUFFIX`($parameterDeclarations): `${name.value}`<$typeParameters> =
+                `${name.value}`($constructorArguments)
+        """.trimIndent()
+    }
+
+    /** [typeParameters] in declaration order (`Input, T1..Tn`); [ports] preserve first-use order. */
+    data class Signature(
+        val typeParameters: List<String>,
+        val ports: Map<String, Pair<String, String>>,
+        val outputType: String,
+    )
 
     companion object {
         const val INVOKE_METHOD_NAME = "invoke"
         const val COM_GENOVICH_COMPONENTS_ACTION = "com.genovich.components.Action"
         const val INPUT_TYPE = "Input"
         const val NOTHING_TYPE = "Nothing"
+        const val ASSEMBLY_SUFFIX = "Assembly"
 
         fun parse(uClass: UClass): ActionDefinition? =
             uClass

@@ -91,13 +91,16 @@ private fun save(actionDefinition: ActionDefinition, project: Project) {
     val actionsPackage = FqName("com.example")
     val assembliesPackage = actionsPackage
 
-    val actionFileName = "${actionDefinition.name.value}.kt"
-    val actionPsiFile = psiElementFactory.createFile(actionFileName, "")
-    val assemblyFileName = "$"
-
+    val actionPsiFile = psiElementFactory.createFile("${actionDefinition.name.value}.kt", "")
     actionPsiFile.add(psiElementFactory.createPackageDirective(actionsPackage))
     actionPsiFile.add(psiElementFactory.createNewLine())
     actionPsiFile.add(psiElementFactory.createClass(actionDefinition.generate()))
+
+    val assemblyPsiFile =
+        psiElementFactory.createFile("${actionDefinition.name.value}${ActionDefinition.ASSEMBLY_SUFFIX}.kt", "")
+    assemblyPsiFile.add(psiElementFactory.createPackageDirective(assembliesPackage))
+    assemblyPsiFile.add(psiElementFactory.createNewLine())
+    assemblyPsiFile.add(psiElementFactory.createFunction(actionDefinition.generateAssembly()))
 
     // 1. EXECUTE WRITE ACTION (Required for modifying the project)
     WriteCommandAction.runWriteCommandAction(project) {
@@ -116,18 +119,22 @@ private fun save(actionDefinition: ActionDefinition, project: Project) {
                 return@runWriteCommandAction
             }
 
-        // find and rewrite or create a new file
-        targetDirectory.findFile(actionPsiFile.name)?.delete()
-        val file = targetDirectory.add(actionPsiFile) as PsiFile
+        // find and rewrite or create a new file, for both the function and its assembly
+        listOf(actionPsiFile, assemblyPsiFile).forEach { psiFile ->
+            targetDirectory.findFile(psiFile.name)?.delete()
+            val file = targetDirectory.add(psiFile) as PsiFile
 
-        // have to commit the document before reformatting
-        PsiDocumentManager.getInstance(project).commitDocument(file.fileDocument)
-        CodeStyleManager.getInstance(project).reformat(file)
+            // have to commit the document before reformatting
+            PsiDocumentManager.getInstance(project).commitDocument(file.fileDocument)
+            CodeStyleManager.getInstance(project).reformat(file)
 
-        // 4. SHOW (Open in Editor)
-        // We use the virtualFile from the *created* file, not the in-memory one
-        file.virtualFile?.let { vFile ->
-            FileEditorManager.getInstance(project).openFile(vFile, true)
-        } ?: println("File not found $file")
+            // 4. SHOW (Open in Editor) — only the function file, to keep the same UX as before
+            // We use the virtualFile from the *created* file, not the in-memory one
+            if (psiFile === actionPsiFile) {
+                file.virtualFile?.let { vFile ->
+                    FileEditorManager.getInstance(project).openFile(vFile, true)
+                } ?: println("File not found $file")
+            }
+        }
     }
 }
