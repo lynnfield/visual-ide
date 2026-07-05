@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import com.genovich.visualide.types.TYPE_NOTHING
 import com.genovich.visualide.ui.AddNewLayoutButton
 import com.genovich.visualide.ui.TextBlock
 import com.genovich.visualide.ui.step
@@ -20,8 +21,6 @@ import org.jetbrains.uast.ULambdaExpression
 import org.jetbrains.uast.UQualifiedReferenceExpression
 import org.jetbrains.uast.UReturnExpression
 import org.jetbrains.uast.tryResolveNamed
-
-private const val REPEAT_WHILE_ACTIVE_FQN = """com.genovich.components.repeatWhileActive"""
 
 data class RepeatWhileActive(
     val body: MutableState<ActionLayout?> = mutableStateOf(null)
@@ -61,16 +60,18 @@ data class RepeatWhileActive(
     ): String {
         // The loop threads its input into the body each iteration and never returns normally.
         body.value?.inferType(input, fresh, ports)
-        return "Nothing"
+        return TYPE_NOTHING
     }
 
     companion object : ActionLayout.UExpressionParser<RepeatWhileActive> {
+        const val REPEAT_WHILE_ACTIVE_FQN = """com.genovich.components.repeatWhileActive"""
+
         override fun parse(expression: UExpression): Result<RepeatWhileActive> = runCatching {
             checkNotNull(expression as? UQualifiedReferenceExpression) { "not a qualified reference expression" }
                 .also {
                     checkNotNull(it.tryResolveNamed()) { "failed to resolve named element" }
                         .let { checkNotNull(it.kotlinFqName) { "expression should have a kotlin fully qualified name" } }
-                        .also { check(FqName("$REPEAT_WHILE_ACTIVE_FQN") == it) { "name should be $REPEAT_WHILE_ACTIVE_FQN" } }
+                        .also { check(FqName(REPEAT_WHILE_ACTIVE_FQN) == it) { "name should be $REPEAT_WHILE_ACTIVE_FQN" } }
                 }
                 .let { checkNotNull(it.selector as? UCallExpression) { "selector should be a call expression" } }
                 .valueArguments

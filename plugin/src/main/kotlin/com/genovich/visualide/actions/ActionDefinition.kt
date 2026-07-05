@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import com.genovich.visualide.types.TYPE_NOTHING
 import com.genovich.visualide.ui.AddNewLayoutButton
 import com.genovich.visualide.ui.TextBlock
 import com.genovich.visualide.ui.step
@@ -55,10 +56,9 @@ data class ActionDefinition(
      */
     fun signature(): Signature {
         val ports = mutableMapOf<String, Pair<String, String>>()
-        var typeVarCount = 0
-        val fresh = { "T${++typeVarCount}" }
-        val outputType = body.value?.inferType(INPUT_TYPE, fresh, ports) ?: NOTHING_TYPE
-        val typeParameters = listOf(INPUT_TYPE) + (1..typeVarCount).map { "T$it" }
+        val typeParameters = mutableListOf(INPUT_TYPE)
+        val fresh = { "T${typeParameters.size}".also(typeParameters::add) }
+        val outputType = body.value?.inferType(INPUT_TYPE, fresh, ports) ?: TYPE_NOTHING
         return Signature(typeParameters, ports, outputType)
     }
 
@@ -129,7 +129,6 @@ data class ActionDefinition(
         const val INVOKE_METHOD_NAME = "invoke"
         const val COM_GENOVICH_COMPONENTS_ACTION = "com.genovich.components.Action"
         const val INPUT_TYPE = "Input"
-        const val NOTHING_TYPE = "Nothing"
         const val ASSEMBLY_SUFFIX = "Assembly"
 
         fun parse(uClass: UClass): ActionDefinition? =

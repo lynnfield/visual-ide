@@ -60,15 +60,18 @@ data class Passing(
         input: String,
         fresh: () -> String,
         ports: MutableMap<String, Pair<String, String>>,
-    ): String = body.fold(input) { accumulated, layout -> layout.inferType(accumulated, fresh, ports) }
+    ): String =
+        body.fold(input) { previousType, layout -> layout.inferType(previousType, fresh, ports) }
 
     companion object : ActionLayout.UExpressionParser<Passing> {
+        const val LET_FQN = "kotlin.StandardKt.let"
+
         override fun parse(expression: UExpression): Result<Passing> = runCatching {
             checkNotNull(expression as? UQualifiedReferenceExpression) { "not a qualified reference expression" }
                 .also {
                     checkNotNull(it.tryResolveNamed()) { "failed to resolve named element" }
                         .let { checkNotNull(it.kotlinFqName) { "expression should have a kotlin fully qualified name" } }
-                        .also { check(FqName("kotlin.StandardKt.let") == it) { "name should be kotlin.StandardKt.let" } }
+                        .also { check(FqName(LET_FQN) == it) { "name should be $LET_FQN" } }
                 }
                 .let { generateSequence(it) { it.receiver as? UQualifiedReferenceExpression } }
                 .map { expression ->

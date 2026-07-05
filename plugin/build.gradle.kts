@@ -35,6 +35,7 @@ repositories {
 // Read more: https://plugins.jetbrains.com/docs/intellij/tools-intellij-platform-gradle-plugin.html
 dependencies {
     testImplementation(libs.junit)
+    testImplementation(libs.assertj.core)
 //    testImplementation(libs.opentest4j)
 //    testImplementation(libs.hamcrest)
 //    testImplementation(libs.composeuitest)

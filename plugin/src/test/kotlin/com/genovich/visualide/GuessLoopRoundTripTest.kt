@@ -13,6 +13,7 @@ import com.intellij.testFramework.LightProjectDescriptor
 import com.intellij.testFramework.PsiTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import kotlinx.coroutines.runBlocking
+import org.assertj.core.api.Assertions.assertThat
 import org.jetbrains.uast.UFile
 import org.jetbrains.uast.toUElementOfType
 import kotlin.uuid.ExperimentalUuidApi
@@ -64,21 +65,19 @@ class GuessLoopRoundTripTest : BasePlatformTestCase() {
 
         val code1 = fileFor(original.generate())
         val reparsed = parseDefinition(code1, "GuessLoop1.kt")
-        assertNotNull("GuessLoop should parse back into a definition", reparsed)
+        assertThat(reparsed).describedAs("GuessLoop should parse back into a definition").isNotNull()
 
         // H1: regenerating from the reparsed model reproduces the same code byte-for-byte.
         val code2 = fileFor(reparsed!!.generate())
-        assertEquals("generate ∘ parse ∘ generate must be a fixed point", code1, code2)
+        assertThat(code2).describedAs("generate ∘ parse ∘ generate must be a fixed point").isEqualTo(code1)
 
         // Structural sanity: the recovered body is Loop(Passing[readGuess, checkGuess]).
         val loop = reparsed.body.value as? RepeatWhileActive
-        assertNotNull("top-level body should be a loop", loop)
+        assertThat(loop).describedAs("top-level body should be a loop").isNotNull()
         val passing = loop!!.body.value as? Passing
-        assertNotNull("loop body should be a passing pipeline", passing)
-        assertEquals(
-            listOf("readGuess", "checkGuess"),
-            passing!!.body.filterIsInstance<Action>().map { it.name.value },
-        )
+        assertThat(passing).describedAs("loop body should be a passing pipeline").isNotNull()
+        assertThat(passing!!.body.filterIsInstance<Action>().map { it.name.value })
+            .isEqualTo(listOf("readGuess", "checkGuess"))
     }
 
     fun testGuessLoopTypeChecks() {
