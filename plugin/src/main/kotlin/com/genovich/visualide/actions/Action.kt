@@ -30,9 +30,7 @@ data class Action(
         input: String,
         fresh: () -> String,
         ports: MutableMap<String, Pair<String, String>>,
-    ): String {
-        return ports.getOrPut(name.value) { input to fresh() }.second
-    }
+    ): String = ports.getOrPut(name.value) { input to fresh() }.second
 
     companion object : ActionLayout.UExpressionParser<Action> {
         override fun parse(expression: UExpression): Result<Action> = runCatching {

@@ -11,7 +11,7 @@ import com.intellij.openapi.roots.ModifiableRootModel
 import com.intellij.testFramework.LightProjectDescriptor
 import com.intellij.testFramework.PsiTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import org.junit.Assert.assertTrue
+import org.assertj.core.api.Assertions.assertThat
 import kotlin.uuid.ExperimentalUuidApi
 
 /**
@@ -41,25 +41,21 @@ class GuessLoopAssemblyTest : BasePlatformTestCase() {
     fun testGeneratesTypedFactory() {
         val code = guessLoopDefinition().generateAssembly()
 
-        assertTrue(
-            "declares the assembly function with threaded type parameters",
-            code.contains("fun <Input, T1, T2> `GuessLoopAssembly`"),
-        )
-        assertTrue(
-            "takes readGuess as a required parameter",
-            code.contains("`readGuess`: com.genovich.components.Action<Input, T1>"),
-        )
-        assertTrue(
-            "takes checkGuess as a required parameter",
-            code.contains("`checkGuess`: com.genovich.components.Action<T1, T2>"),
-        )
-        assertTrue(
-            "returns the GuessLoop type",
-            code.contains(": `GuessLoop`<Input, T1, T2>"),
-        )
-        assertTrue("constructs GuessLoop", code.contains("`GuessLoop`("))
-        assertTrue("wires readGuess", code.contains("`readGuess` = `readGuess`"))
-        assertTrue("wires checkGuess", code.contains("`checkGuess` = `checkGuess`"))
+        assertThat(code)
+            .describedAs("declares the assembly function with threaded type parameters")
+            .contains("fun <Input, T1, T2> `GuessLoopAssembly`")
+        assertThat(code)
+            .describedAs("takes readGuess as a required parameter")
+            .contains("`readGuess`: com.genovich.components.Action<Input, T1>")
+        assertThat(code)
+            .describedAs("takes checkGuess as a required parameter")
+            .contains("`checkGuess`: com.genovich.components.Action<T1, T2>")
+        assertThat(code)
+            .describedAs("returns the GuessLoop type")
+            .contains(": `GuessLoop`<Input, T1, T2>")
+        assertThat(code).describedAs("constructs GuessLoop").contains("`GuessLoop`(")
+        assertThat(code).describedAs("wires readGuess").contains("`readGuess` = `readGuess`")
+        assertThat(code).describedAs("wires checkGuess").contains("`checkGuess` = `checkGuess`")
     }
 
     fun testAssemblyTypeChecks() {

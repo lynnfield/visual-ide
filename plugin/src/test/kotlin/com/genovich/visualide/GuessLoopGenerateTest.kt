@@ -4,7 +4,7 @@ import com.genovich.visualide.actions.Action
 import com.genovich.visualide.actions.ActionDefinition
 import com.genovich.visualide.actions.Passing
 import com.genovich.visualide.actions.RepeatWhileActive
-import org.junit.Assert.assertTrue
+import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 import kotlin.uuid.ExperimentalUuidApi
 
@@ -29,24 +29,20 @@ class GuessLoopGenerateTest {
 
         val code = definition.generate()
 
-        assertTrue(
-            "declares threaded type parameters",
-            code.contains("class `GuessLoop`<Input, T1, T2>"),
-        )
-        assertTrue(
-            "types the readGuess port",
-            code.contains("val `readGuess`: com.genovich.components.Action<Input, T1>"),
-        )
-        assertTrue(
-            "types the checkGuess port",
-            code.contains("val `checkGuess`: com.genovich.components.Action<T1, T2>"),
-        )
-        assertTrue(
-            "the loop's output type is Nothing",
-            code.contains(": com.genovich.components.Action<Input, Nothing>"),
-        )
-        assertTrue("emits the loop", code.contains("com.genovich.components.repeatWhileActive"))
-        assertTrue("pipes readGuess", code.contains(".let { `readGuess`(it) }"))
-        assertTrue("pipes checkGuess", code.contains(".let { `checkGuess`(it) }"))
+        assertThat(code)
+            .describedAs("declares threaded type parameters")
+            .contains("class `GuessLoop`<Input, T1, T2>")
+        assertThat(code)
+            .describedAs("types the readGuess port")
+            .contains("val `readGuess`: com.genovich.components.Action<Input, T1>")
+        assertThat(code)
+            .describedAs("types the checkGuess port")
+            .contains("val `checkGuess`: com.genovich.components.Action<T1, T2>")
+        assertThat(code)
+            .describedAs("the loop's output type is Nothing")
+            .contains(": com.genovich.components.Action<Input, Nothing>")
+        assertThat(code).describedAs("emits the loop").contains(RepeatWhileActive.REPEAT_WHILE_ACTIVE_FQN)
+        assertThat(code).describedAs("pipes readGuess").contains(".let { `readGuess`(it) }")
+        assertThat(code).describedAs("pipes checkGuess").contains(".let { `checkGuess`(it) }")
     }
 }

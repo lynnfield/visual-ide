@@ -8,6 +8,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import com.genovich.visualide.types.TYPE_NOTHING
 import com.genovich.visualide.ui.AddNewLayoutButton
 import com.genovich.visualide.ui.TextBlock
 import com.genovich.visualide.ui.step
@@ -47,7 +48,7 @@ data class RetryUntilResult(
     }
 
     override fun generate(input: String): String = """
-        com.genovich.components.retryUntilResult {
+        $RETRY_UNTIL_RESULT_FQN {
             ${(body.value?.generate(input) ?: TodoStub.generate())}
         }
     """.trimIndent()
@@ -56,15 +57,17 @@ data class RetryUntilResult(
         input: String,
         fresh: () -> String,
         ports: MutableMap<String, Pair<String, String>>,
-    ): String = body.value?.inferType(input, fresh, ports) ?: "Nothing"
+    ): String = body.value?.inferType(input, fresh, ports) ?: TYPE_NOTHING
 
     companion object : ActionLayout.UExpressionParser<RetryUntilResult> {
+        const val RETRY_UNTIL_RESULT_FQN = "com.genovich.components.retryUntilResult"
+
         override fun parse(expression: UExpression): Result<RetryUntilResult> = runCatching {
             ActionLayout.parse(checkNotNull(expression as? UQualifiedReferenceExpression) { "not a qualified reference expression" }
                 .also {
                     checkNotNull(it.tryResolveNamed()) { "failed to resolve named element" }
                         .let { checkNotNull(it.kotlinFqName) { "expression should have a kotlin fully qualified name" } }
-                        .also { check(FqName("com.genovich.components.retryUntilResult") == it) { "name should be com.genovich.components.retryUntilResult" } }
+                        .also { check(FqName(RETRY_UNTIL_RESULT_FQN) == it) { "name should be $RETRY_UNTIL_RESULT_FQN" } }
                 }
                 .let { checkNotNull(it.selector as? UCallExpression) { "selector should be a call expression" } }
                 .valueArguments
