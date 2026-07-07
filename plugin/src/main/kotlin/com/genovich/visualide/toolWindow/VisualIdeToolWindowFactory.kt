@@ -102,6 +102,17 @@ private fun save(actionDefinition: ActionDefinition, project: Project) {
     assemblyPsiFile.add(psiElementFactory.createNewLine())
     assemblyPsiFile.add(psiElementFactory.createFunction(actionDefinition.generateAssembly()))
 
+    // only present when the definition has at least one T-function port (design.md §3.3)
+    val uiStateFlowPsiFile = actionDefinition.generateUiStateFlow()?.let { uiStateFlowCode ->
+        psiElementFactory
+            .createFile("${actionDefinition.name.value}${ActionDefinition.UI_STATE_FLOW_SUFFIX}.kt", "")
+            .apply {
+                add(psiElementFactory.createPackageDirective(assembliesPackage))
+                add(psiElementFactory.createNewLine())
+                add(psiElementFactory.createClass(uiStateFlowCode))
+            }
+    }
+
     // 1. EXECUTE WRITE ACTION (Required for modifying the project)
     WriteCommandAction.runWriteCommandAction(project) {
         val targetVirtualFile = project.guessProjectDir()?.findDirectory(dir) ?: run {
@@ -119,8 +130,9 @@ private fun save(actionDefinition: ActionDefinition, project: Project) {
                 return@runWriteCommandAction
             }
 
-        // find and rewrite or create a new file, for both the function and its assembly
-        listOf(actionPsiFile, assemblyPsiFile).forEach { psiFile ->
+        // find and rewrite or create a new file, for the function, its assembly, and (if the
+        // definition has any T-function ports) its state projection
+        listOfNotNull(actionPsiFile, assemblyPsiFile, uiStateFlowPsiFile).forEach { psiFile ->
             targetDirectory.findFile(psiFile.name)?.delete()
             val file = targetDirectory.add(psiFile) as PsiFile
 

@@ -139,10 +139,16 @@ in lockstep, and vice versa — they are two halves of one contract, verified by
   using a shared `<Input, Output>` placeholder type.
 - **Rung 1 (done)** — real per-port type inference (H2): each port gets its own inferred
   `Action<In, Out>` type via `inferType`, and the generated code actually type-checks.
-- **Not yet implemented**: assembly (`*Assembly`) file generation, `@Node`/`@Diagram` annotations
-  and checksums, value-plumbing nodes (Tuple/Construct/Copy/Project/Select/Guard/Not), Branch,
-  Parallel, `Try`, and the T-function (UI boundary) node. See `docs/design.md` §6.3–6.4 for the
-  planned order.
+- **Rung 2 / Step 1 (done)** — assembly file generation (`ActionDefinition.generateAssembly()`),
+  the wiring half of H3. See `docs/example-rung2.md`. `parseAssembly` (dependency-plane round-trip)
+  is still open.
+- **Rung 2 / Step 2 (done)** — T-function ports (`Action.isTFunction`) and the derived
+  `<Name>UiStateFlow` projection (`ActionDefinition.generateUiStateFlow()`), the projection half of
+  H3, plus H7. See `docs/example-rung3.md`.
+- **Not yet implemented**: `@Node`/`@Diagram` annotations and checksums, the engine IR /
+  `KotlinAnalysis` host-abstraction boundary, value-plumbing nodes
+  (Tuple/Construct/Copy/Project/Select/Guard/Not), Branch, and Parallel. See
+  `docs/implementation-plan.md` (Steps 3–5) and `docs/design.md` §6.3–6.4 for the planned order.
 
 ### UAST, not raw PSI
 

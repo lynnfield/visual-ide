@@ -17,15 +17,25 @@ interface ActionLayout : Iterable<ActionLayout> {
 
     /**
      * Structural type inference (design doc rung 1 / H2). Given the [input] type expression,
-     * returns this node's output type expression, recording each leaf port's `<in, out>` types
+     * returns this node's output type expression, recording each leaf port's signature
      * into [ports] (keyed by port name; first occurrence wins). [fresh] mints unique
      * type-variable names.
      */
     fun inferType(
         input: String,
         fresh: () -> String,
-        ports: MutableMap<String, Pair<String, String>>,
+        ports: MutableMap<String, PortSignature>,
     ): String
+
+    /**
+     * A leaf port's inferred `<in, out>` types plus whether it is a T-function (design doc §1.6,
+     * §5.1): a port whose assembly default is `Show(flow)`, rung 2 step 2 / H3 projection.
+     */
+    data class PortSignature(
+        val inputType: String,
+        val outputType: String,
+        val isTFunction: Boolean = false,
+    )
 
     fun interface UExpressionParser<out T : ActionLayout?> {
         fun parse(expression: UExpression): Result<T>
