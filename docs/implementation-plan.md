@@ -13,11 +13,13 @@ architecture and what "done" means for the earlier rungs.
 - **Rung 2 / Step 1 (done)** — assembly file generation (`ActionDefinition.generateAssembly()`);
   `save()` emits both `<Name>.kt` and `<Name>Assembly.kt`. Validates the *wiring* half of H3. See
   `docs/example-rung2.md`. `parseAssembly` (the round-trip stretch goal) is still open.
-- **Rung 2 / Step 2 (done)** — T-function ports (`Action.isTFunction`) and the derived
-  `<Name>UiStateFlow` projection (`ActionDefinition.generateUiStateFlow()`); `save()` emits the
-  third file when a definition has T-function ports. Validates the *projection* half of H3 and H7.
-  See `docs/example-rung3.md`. Only one T-function port is exercised so far (multi-port `combine`
-  is written to generalize but untested); T-ness doesn't round-trip (same `parseAssembly` gap).
+- **Rung 2 / Step 2 (done)** — T-function ports, modeled as their own leaf node type (`TFunction`,
+  alongside `Action`) and the derived `<Name>UiStateFlow` projection
+  (`ActionDefinition.generateUiStateFlow()`); `save()` emits the third file when a definition has
+  T-function ports. Validates the *projection* half of H3 and H7. See `docs/example-rung3.md`. Only
+  one T-function port is exercised so far (multi-port `combine` is written to generalize but
+  untested); T-ness doesn't round-trip (same `parseAssembly` gap — a reparsed `TFunction` always
+  comes back as a plain `Action`, since `TFunction.generate()` is indistinguishable from `Action`'s).
 
 The engine lives in `plugin/src/main/kotlin/com/genovich/visualide/actions/`:
 `ActionLayout` (node interface: `Render` / `generate` / `inferType` / `parse`), the nodes
@@ -95,8 +97,12 @@ round-trips.) Validates the wiring half of H3.
 **Goal.** Introduce the T-function and the derived `<Name>UiStateFlow`. The projection is
 undemonstrable without a `Show`-bound port, so it is sequenced here, right after the assembly.
 
-**Note (as implemented).** A marker/attribute on the leaf (`Action.isTFunction`), not a distinct
-node type — see `docs/example-rung3.md` for the full write-up, including two real mistakes
+**Note (as implemented).** A distinct leaf node type, `TFunction`, alongside `Action` (registered
+in the add-node menu, not in `ActionLayout.parse`'s dispatcher — see `docs/example-rung3.md` for
+why it can't have a parser). An earlier pass tried a marker/attribute on `Action` instead
+(`isTFunction: MutableState<Boolean>`); both worked and passed identical tests, but the node-type
+version was chosen to keep T-functions a first-class part of the node catalog rather than a
+toggle — see `docs/example-rung3.md` for the full write-up, including two real mistakes
 `checkHighlighting` caught: `emitSelfWhenHaveValue` can't be an extension function (fully-qualified
 calls with no imports can't use receiver-dot syntax), and the nested `Screen` sealed interface
 needs its own explicit type parameter list (nested, non-`inner` types don't inherit the enclosing

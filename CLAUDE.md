@@ -103,11 +103,17 @@ types, each of which is simultaneously:
 3. a structural type-inference step (`inferType` — mints per-port type variables so generated
    code actually type-checks instead of sharing one placeholder `<Input, Output>`), and
 4. a UAST parser (`companion object : ActionLayout.UExpressionParser<T>`, `parse`) that recognizes
-   its own generated shape in source and reconstructs the model from it.
+   its own generated shape in source and reconstructs the model from it — with one deliberate
+   exception, `TFunction` (below), whose `generate()` is indistinguishable from `Action`'s and so
+   cannot have a parser without creating ambiguous-match errors in the dispatcher.
 
 Current node types, each in its own file:
 
 - `Action` — a leaf port call (`` `name`(input) ``).
+- `TFunction` — a leaf port call, identical to `Action` at the function level, but a T-function
+  (design.md §1.6, §5.1): its assembly default is `Show(flow)` instead of a required parameter,
+  and it contributes a flow to the generated `<Name>UiStateFlow` projection. No parser (see above);
+  a reparsed T-function leaf always comes back as a plain `Action` — see `docs/example-rung3.md`.
 - `Passing` — a linear pipeline (`.let { }` chain); models the Sequence operator.
 - `RepeatWhileActive` — an infinite loop (`repeatWhileActive { }`); returns `Nothing`.
 - `RetryUntilResult` — a decorator that retries its body until it returns without throwing.
@@ -142,9 +148,10 @@ in lockstep, and vice versa — they are two halves of one contract, verified by
 - **Rung 2 / Step 1 (done)** — assembly file generation (`ActionDefinition.generateAssembly()`),
   the wiring half of H3. See `docs/example-rung2.md`. `parseAssembly` (dependency-plane round-trip)
   is still open.
-- **Rung 2 / Step 2 (done)** — T-function ports (`Action.isTFunction`) and the derived
-  `<Name>UiStateFlow` projection (`ActionDefinition.generateUiStateFlow()`), the projection half of
-  H3, plus H7. See `docs/example-rung3.md`.
+- **Rung 2 / Step 2 (done)** — T-function ports, a distinct leaf node type (`TFunction`, no
+  parser — see `docs/example-rung3.md`), and the derived `<Name>UiStateFlow` projection
+  (`ActionDefinition.generateUiStateFlow()`), the projection half of H3, plus H7. See
+  `docs/example-rung3.md`.
 - **Not yet implemented**: `@Node`/`@Diagram` annotations and checksums, the engine IR /
   `KotlinAnalysis` host-abstraction boundary, value-plumbing nodes
   (Tuple/Construct/Copy/Project/Select/Guard/Not), Branch, and Parallel. See
