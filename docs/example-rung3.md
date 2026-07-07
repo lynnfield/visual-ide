@@ -8,17 +8,42 @@ the **projection half of H3** (state projection is mechanically generable) and *
 
 ## The T-function scheme
 
-A leaf port (`Action`) now carries an `isTFunction: MutableState<Boolean>` marker (default
-`false`), toggled via a checkbox in its `Render`. Per design.md §5.1, T-ness is **invisible at the
-function level** — `Action.generate()` and `Action.parse()` are unchanged, so it never appears in
-the function file and does not round-trip through `parse()` (recovering it would need
-`parseAssembly`, which isn't implemented — see the rung 2 step 1 limitations). It only affects
-`ActionDefinition.generateAssembly()` and the new `generateUiStateFlow()`.
+A T-function is a **distinct leaf node type**, `TFunction`, alongside `Action` — not a marker on
+`Action` (an earlier version of this rung tried that; see the note at the end of this section).
+Structurally it's a near-twin of `Action`: same `name` state, same `generate()`/`inferType()`
+shape, added to the diagram via its own "T-function" entry in the add-node context menu
+(`AddNewLayoutSelector.kt`) alongside "Action".
 
-Threading T-ness through `inferType` required widening the ports map's value type from a bare
-`Pair<String, String>` to a new `ActionLayout.PortSignature(inputType, outputType, isTFunction)`
-— every node's `inferType` signature changed accordingly (mechanical; no behavior change for
-non-`Action` nodes, which just forward the map).
+Per design.md §5.1, T-ness is **invisible at the function level** — `TFunction.generate()` emits
+the exact same shape as `Action.generate()` (`` `name`(input) ``), so it never appears differently
+in the function file. A consequence of that: parsing generated code can **never recover a
+`TFunction`** from a leaf call — there is nothing in the text to distinguish it from a plain
+`Action`, so a reparsed `TFunction` always comes back as an `Action` (see `TFunction`'s KDoc).
+`TFunction` therefore has no `ActionLayout.UExpressionParser` and is not registered in
+`ActionLayout.parse`'s dispatcher — a deliberate, documented exception to the "every node type has
+a parser" convention, not an oversight. This is the same round-trip limitation the marker-based
+design had; only *where* the information lives changed, not whether it survives a reparse.
+
+Both leaf types report into the same `ports` map during `inferType`, so `ActionDefinition` doesn't
+need to know or care which leaf type produced a given port — it only reads
+`ActionLayout.PortSignature.isTFunction` off the map entry, populated as `true` by `TFunction` and
+`false` (the default) by `Action`. This is why `PortSignature` — the ports map's value type,
+replacing a bare `Pair<String, String>` — carries `isTFunction` at all: it's the shared contract
+between whichever leaf type minted the port and `generateAssembly()`/`generateUiStateFlow()`, which
+don't otherwise see the leaf nodes themselves. Every node's `inferType` signature changed
+accordingly (mechanical; no behavior change for `Passing`/`RepeatWhileActive`/`RetryUntilResult`,
+which just forward the map).
+
+**Why not a marker on `Action`?** That was this rung's first implementation, and it worked (same
+generated output, same tests) — but a marker means every `Action` node carries a boolean that's
+almost always false, and "is this leaf a T-function" is a yes/no toggle on an otherwise-identical
+node rather than a distinct thing you add to the diagram. A separate node type makes T-functions a
+first-class part of the node catalog (consistent with how `RepeatWhileActive`/`RetryUntilResult`/
+etc. are each their own type) and lets the add-node menu offer it directly, at the cost of near-
+duplicating `Action`'s four members (there was no clean way to share them without either inheritance
+between two `data class` node types — awkward with `copy()`/`equals()` — or extracting a common
+non-node helper that both `generate()`/`inferType()` call into, which would've been more indirection
+than the ~10 duplicated lines justified at this scale).
 
 `generateAssembly()` now gives each T-function port a default:
 
@@ -88,8 +113,11 @@ aliases to kotlinx — the fixture only needs to type-check, never run), `UiStat
 
 - `actions/ActionLayout.kt` — added `PortSignature(inputType, outputType, isTFunction)`; widened
   `inferType`'s `ports` map to `MutableMap<String, PortSignature>`.
-- `actions/Action.kt` — added `isTFunction` marker (+ constructor param, + a Jewel `Checkbox`
-  toggle in `Render`); `inferType` now records it into `PortSignature`.
+- `actions/TFunction.kt` (new) — the T-function leaf node: `name` state, `Render`, `generate()`
+  (identical shape to `Action`'s), `inferType()` (records `isTFunction = true`). No parser (see
+  above).
+- `actions/Action.kt` — unchanged from before this rung; `inferType` records `PortSignature`s with
+  `isTFunction` defaulted `false`.
 - `actions/Passing.kt`, `RepeatWhileActive.kt`, `RetryUntilResult.kt` — mechanical `inferType`
   signature update (`ports` map's new value type); no logic change.
 - `actions/ActionDefinition.kt` — `generate()` updated for the new `PortSignature` field names;
@@ -98,9 +126,11 @@ aliases to kotlinx — the fixture only needs to type-check, never run), `UiStat
   `UI_STATE_FLOW_PARAM_NAME`, and the new `com.genovich.components.*` FQNs).
 - `toolWindow/VisualIdeToolWindowFactory.kt` — `save()` now also writes `<Name>UiStateFlow.kt` when
   `generateUiStateFlow()` is non-null.
+- `ui/AddNewLayoutSelector.kt` — added a "T-function" entry to the add-node context menu, alongside
+  "Action".
 - `plugin/src/test/testData/specimen/Components.kt` — stub growth (see above).
 - `GuessLoopGenerateTest`, `GuessLoopRoundTripTest`, `GuessLoopAssemblyTest` — specimen evolved so
-  `readGuess` is a T-function; assertions updated/added accordingly.
+  `readGuess` is a `TFunction`; assertions updated/added accordingly.
 - `GuessLoopUiStateFlowTest` (new) — asserts the generated shape in-memory, that no T-function
   ports produces `null`, and that the generated class type-checks (`checkHighlighting`).
 
@@ -137,13 +167,22 @@ aliases to kotlinx — the fixture only needs to type-check, never run), `UiStat
   single-expression factory with defaulted Show(...) parameters (default expressions can't see
   local vals), so it was dropped in favor of the parameter-based design documented above, which
   also happens to fit D5's override-seam pattern for free.
+- T-ness itself also went through a revision after this rung first landed: it started as an
+  `isTFunction` marker on `Action` (a toggleable boolean, checkbox in `Render`), then was reworked
+  into the separate `TFunction` node type described above. Both compiled, both passed the exact
+  same tests (down to identical generated-code assertions) — the marker's `PortSignature.isTFunction
+  = isTFunction.value` just became `TFunction`'s hardcoded `isTFunction = true` — because
+  `ports`/`PortSignature` was already the shared boundary between "whatever produced this port" and
+  `generateAssembly()`/`generateUiStateFlow()`, so swapping the producer's shape didn't ripple past
+  `Action`/`TFunction` themselves.
 
 ## Limitations / notes (feed back into §6 and later steps)
 
 - **T-ness doesn't round-trip.** Like assembly wiring (rung 2 step 1), there is no `parseAssembly`,
-  so nothing recovers a port's T-function marker from generated code — it only exists in the live,
-  in-memory diagram model (or is set again by hand after a reparse). This is an accepted extension
-  of the existing gap, not a new one.
+  so nothing recovers a `TFunction` from generated code — a reparsed T-function leaf always comes
+  back as a plain `Action`. This is an accepted extension of the existing gap, not a new one, and
+  isn't specific to the node-type-vs-marker choice above — either shape has the same blind spot,
+  since it's the function file's generated *text* that carries no signal either way.
 - **Only one T-function port exercised.** `GuessLoop` only has `readGuess` as a T-function;
   `combine`'s vararg + `Screen`'s multi-case sealed wrapper are written to generalize to N
   T-function ports (relying on `StateFlow`'s declared covariance, `out T`, so each

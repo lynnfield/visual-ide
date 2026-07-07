@@ -4,6 +4,7 @@ import com.genovich.visualide.actions.Action
 import com.genovich.visualide.actions.ActionDefinition
 import com.genovich.visualide.actions.Passing
 import com.genovich.visualide.actions.RepeatWhileActive
+import com.genovich.visualide.actions.TFunction
 import org.assertj.core.api.Assertions.assertThat
 import org.junit.Test
 import kotlin.uuid.ExperimentalUuidApi
@@ -20,12 +21,12 @@ class GuessLoopGenerateTest {
 
     @Test
     fun generatesLoopOverPipeline() {
-        // readGuess is a T-function (rung 2 step 2) — invisible here on purpose: T-ness only
-        // affects generateAssembly(), never the function file (design.md §5.1).
+        // readGuess is a T-function (rung 2 step 2) — invisible here on purpose: it generates the
+        // exact same shape as Action, never the function file (design.md §5.1).
         val definition = ActionDefinition(
             name = "GuessLoop",
             body = RepeatWhileActive(
-                Passing(listOf(Action("readGuess", isTFunction = true), Action("checkGuess"))),
+                Passing(listOf(TFunction("readGuess"), Action("checkGuess"))),
             ),
         )
 

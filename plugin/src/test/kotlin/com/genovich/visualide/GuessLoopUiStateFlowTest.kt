@@ -4,6 +4,7 @@ import com.genovich.visualide.actions.Action
 import com.genovich.visualide.actions.ActionDefinition
 import com.genovich.visualide.actions.Passing
 import com.genovich.visualide.actions.RepeatWhileActive
+import com.genovich.visualide.actions.TFunction
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.roots.ContentEntry
@@ -35,7 +36,7 @@ class GuessLoopUiStateFlowTest : BasePlatformTestCase() {
     private fun guessLoopDefinition() = ActionDefinition(
         name = "GuessLoop",
         body = RepeatWhileActive(
-            Passing(listOf(Action("readGuess", isTFunction = true), Action("checkGuess"))),
+            Passing(listOf(TFunction("readGuess"), Action("checkGuess"))),
         ),
     )
 

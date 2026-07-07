@@ -1,25 +1,19 @@
 package com.genovich.visualide.actions
 
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.genovich.visualide.ui.TextBlock
-import org.jetbrains.jewel.ui.component.Checkbox
-import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.uast.UCallExpression
 import org.jetbrains.uast.UExpression
 import org.jetbrains.uast.tryResolveNamed
 
 data class Action(
-    val name: MutableState<String> = mutableStateOf("New Action"),
-    val isTFunction: MutableState<Boolean> = mutableStateOf(false),
+    val name: MutableState<String> = mutableStateOf("New Action")
 ) : ActionLayout {
 
-    constructor(name: String, isTFunction: Boolean = false) : this(mutableStateOf(name), mutableStateOf(isTFunction))
+    constructor(name: String) : this(mutableStateOf(name))
 
     override fun iterator(): Iterator<ActionLayout> = iterator {
         yield(this@Action)
@@ -27,27 +21,16 @@ data class Action(
 
     @Composable
     override fun Render(onRemove: () -> Unit, modifier: Modifier) {
-        Column(modifier = modifier) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(checked = isTFunction.value, onCheckedChange = { isTFunction.value = it })
-                Text("T-function")
-            }
-            TextBlock(name, onRemove = onRemove)
-        }
+        TextBlock(name, onRemove = onRemove, modifier = modifier)
     }
 
     override fun generate(input: String): String = "`${name.value}`($input)"
 
-    // T-ness is invisible at the function level (design.md §5.1) — it only affects the assembly's
-    // default wiring, so it is not part of the generated function file and does not round-trip
-    // via parse() (parseAssembly, which would recover it, is not implemented yet — see rung 2).
     override fun inferType(
         input: String,
         fresh: () -> String,
         ports: MutableMap<String, ActionLayout.PortSignature>,
-    ): String = ports.getOrPut(name.value) {
-        ActionLayout.PortSignature(input, fresh(), isTFunction.value)
-    }.outputType
+    ): String = ports.getOrPut(name.value) { ActionLayout.PortSignature(input, fresh()) }.outputType
 
     companion object : ActionLayout.UExpressionParser<Action> {
         override fun parse(expression: UExpression): Result<Action> = runCatching {
