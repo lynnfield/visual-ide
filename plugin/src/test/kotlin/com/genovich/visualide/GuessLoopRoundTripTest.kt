@@ -55,11 +55,14 @@ class GuessLoopRoundTripTest : BasePlatformTestCase() {
         // Make `com.genovich.components` resolvable for UAST (parsers match on resolved FqNames).
         myFixture.copyFileToProject("specimen/Components.kt", "com/genovich/components/Components.kt")
 
-        // The diagram model for GuessLoop, built directly.
+        // The diagram model for GuessLoop, built directly. readGuess is a T-function (rung 2 step
+        // 2), but that marker is invisible to generate() (design.md §5.1) and isn't recovered by
+        // parse() either (parseAssembly, which would, is not implemented — see docs/example-rung2.md),
+        // so H1 below is unaffected: the reparsed model's readGuess reverts to isTFunction=false.
         val original = ActionDefinition(
             name = "GuessLoop",
             body = RepeatWhileActive(
-                Passing(listOf(Action("readGuess"), Action("checkGuess"))),
+                Passing(listOf(Action("readGuess", isTFunction = true), Action("checkGuess"))),
             ),
         )
 
@@ -89,7 +92,7 @@ class GuessLoopRoundTripTest : BasePlatformTestCase() {
         val definition = ActionDefinition(
             name = "GuessLoop",
             body = RepeatWhileActive(
-                Passing(listOf(Action("readGuess"), Action("checkGuess"))),
+                Passing(listOf(Action("readGuess", isTFunction = true), Action("checkGuess"))),
             ),
         )
 
