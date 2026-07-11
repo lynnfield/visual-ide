@@ -4,7 +4,6 @@ import com.genovich.visualide.actions.Action
 import com.genovich.visualide.actions.ActionDefinition
 import com.genovich.visualide.actions.Passing
 import com.genovich.visualide.actions.RepeatWhileActive
-import com.genovich.visualide.actions.TFunction
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.application.smartReadAction
 import com.intellij.openapi.module.Module
@@ -56,14 +55,11 @@ class GuessLoopRoundTripTest : BasePlatformTestCase() {
         // Make `com.genovich.components` resolvable for UAST (parsers match on resolved FqNames).
         myFixture.copyFileToProject("specimen/Components.kt", "com/genovich/components/Components.kt")
 
-        // The diagram model for GuessLoop, built directly. readGuess is a T-function (rung 2 step
-        // 2), but TFunction.generate() emits the exact same shape as Action's (design.md §5.1) and
-        // TFunction has no parser (see TFunction's KDoc), so H1 below is unaffected: the reparsed
-        // model's readGuess always comes back as a plain Action, never a TFunction.
+        // The diagram model for GuessLoop, built directly.
         val original = ActionDefinition(
             name = "GuessLoop",
             body = RepeatWhileActive(
-                Passing(listOf(TFunction("readGuess"), Action("checkGuess"))),
+                Passing(listOf(Action("readGuess"), Action("checkGuess"))),
             ),
         )
 
@@ -93,7 +89,7 @@ class GuessLoopRoundTripTest : BasePlatformTestCase() {
         val definition = ActionDefinition(
             name = "GuessLoop",
             body = RepeatWhileActive(
-                Passing(listOf(TFunction("readGuess"), Action("checkGuess"))),
+                Passing(listOf(Action("readGuess"), Action("checkGuess"))),
             ),
         )
 

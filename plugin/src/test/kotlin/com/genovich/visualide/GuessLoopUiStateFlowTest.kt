@@ -4,7 +4,6 @@ import com.genovich.visualide.actions.Action
 import com.genovich.visualide.actions.ActionDefinition
 import com.genovich.visualide.actions.Passing
 import com.genovich.visualide.actions.RepeatWhileActive
-import com.genovich.visualide.actions.TFunction
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.roots.ContentEntry
@@ -20,10 +19,11 @@ import kotlin.uuid.ExperimentalUuidApi
  * of H3, plus H7 (a `Show`-bound port derives a `UiStateFlow` leaf).
  *
  * `ActionDefinition.generateUiStateFlow()` produces `GuessLoopUiStateFlow`: one
- * `MutableStateFlow<UiState<in, out>?>` per T-function port, `combine`d into a sealed "which
- * screen is live" `Screen` with one case per T-function. `null` when there are no T-function
- * ports — nothing to project. [testUiStateFlowTypeChecks] proves the generated class type-checks,
- * the same way [GuessLoopAssemblyTest.testAssemblyTypeChecks] proves the assembly does.
+ * `MutableStateFlow<UiState<in, out>?>` per port named in `ActionDefinition.tFunctionPorts`,
+ * `combine`d into a sealed "which screen is live" `Screen` with one case per T-function. `null`
+ * when `tFunctionPorts` is empty — nothing to project. [testUiStateFlowTypeChecks] proves the
+ * generated class type-checks, the same way [GuessLoopAssemblyTest.testAssemblyTypeChecks] proves
+ * the assembly does.
  */
 @OptIn(ExperimentalUuidApi::class)
 class GuessLoopUiStateFlowTest : BasePlatformTestCase() {
@@ -36,8 +36,9 @@ class GuessLoopUiStateFlowTest : BasePlatformTestCase() {
     private fun guessLoopDefinition() = ActionDefinition(
         name = "GuessLoop",
         body = RepeatWhileActive(
-            Passing(listOf(TFunction("readGuess"), Action("checkGuess"))),
+            Passing(listOf(Action("readGuess"), Action("checkGuess"))),
         ),
+        tFunctionPorts = setOf("readGuess"),
     )
 
     fun testGeneratesUiStateFlow() {
@@ -52,7 +53,7 @@ class GuessLoopUiStateFlowTest : BasePlatformTestCase() {
                 "val `readGuessFlow`: com.genovich.components.MutableStateFlow<com.genovich.components.UiState<Input, T1>?>",
             )
         assertThat(code)
-            .describedAs("no flow for checkGuess — it isn't a T-function")
+            .describedAs("no flow for checkGuess — it isn't attached as a T-function")
             .doesNotContain("checkGuessFlow")
         assertThat(code)
             .describedAs("sealed Screen has one case per T-function")
@@ -75,7 +76,7 @@ class GuessLoopUiStateFlowTest : BasePlatformTestCase() {
         )
 
         assertThat(definition.generateUiStateFlow())
-            .describedAs("nothing to project when no port is a T-function")
+            .describedAs("nothing to project when tFunctionPorts is empty")
             .isNull()
     }
 

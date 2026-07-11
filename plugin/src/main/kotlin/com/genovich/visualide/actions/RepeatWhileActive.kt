@@ -56,7 +56,7 @@ data class RepeatWhileActive(
     override fun inferType(
         input: String,
         fresh: () -> String,
-        ports: MutableMap<String, ActionLayout.PortSignature>,
+        ports: MutableMap<String, Pair<String, String>>,
     ): String {
         // The loop threads its input into the body each iteration and never returns normally.
         body.value?.inferType(input, fresh, ports)

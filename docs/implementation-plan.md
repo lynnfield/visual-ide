@@ -13,20 +13,21 @@ architecture and what "done" means for the earlier rungs.
 - **Rung 2 / Step 1 (done)** — assembly file generation (`ActionDefinition.generateAssembly()`);
   `save()` emits both `<Name>.kt` and `<Name>Assembly.kt`. Validates the *wiring* half of H3. See
   `docs/example-rung2.md`. `parseAssembly` (the round-trip stretch goal) is still open.
-- **Rung 2 / Step 2 (done)** — T-function ports, modeled as their own leaf node type (`TFunction`,
-  alongside `Action`) and the derived `<Name>UiStateFlow` projection
-  (`ActionDefinition.generateUiStateFlow()`); `save()` emits the third file when a definition has
-  T-function ports. Validates the *projection* half of H3 and H7. See `docs/example-rung3.md`. Only
-  one T-function port is exercised so far (multi-port `combine` is written to generalize but
-  untested); T-ness doesn't round-trip (same `parseAssembly` gap — a reparsed `TFunction` always
-  comes back as a plain `Action`, since `TFunction.generate()` is indistinguishable from `Action`'s).
+- **Rung 2 / Step 2 (done)** — T-function ports, attached via `ActionDefinition.tFunctionPorts` (a
+  definition-level "known list" of port names, not a leaf-node flag or type — see
+  `docs/example-rung3.md` for why), and the derived `<Name>UiStateFlow` projection
+  (`ActionDefinition.generateUiStateFlow()`). `save()` emits the third file when a definition has
+  T-function ports. Validates the *projection* half of H3, plus H7. `com.genovich.components.Show`
+  is the only recognized T-function binding (`actions/Show.kt`); customizable/multi-kind
+  recognition is an open hypothesis (design.md §5.1).
 
 The engine lives in `plugin/src/main/kotlin/com/genovich/visualide/actions/`:
 `ActionLayout` (node interface: `Render` / `generate` / `inferType` / `parse`), the nodes
-(`Action`, `Passing`, `RepeatWhileActive`, `RetryUntilResult`, `TodoStub`), and `ActionDefinition`
-(the function file: `signature()` + `generate()` + `generateAssembly()` + `parse(UClass)`). The
-tool window's `save()` (`toolWindow/VisualIdeToolWindowFactory.kt`) writes both the function file
-and its assembly.
+(`Action`, `Passing`, `RepeatWhileActive`, `RetryUntilResult`, `TodoStub`), `Show` (a recognizer,
+not a node — see Step 2 below), and `ActionDefinition` (the function file: `signature()` +
+`generate()` + `generateAssembly()` + `generateUiStateFlow()` + `parse(UClass)`, plus the
+`tFunctionPorts` state). The tool window's `save()` (`toolWindow/VisualIdeToolWindowFactory.kt`)
+writes the function file, its assembly, and (when applicable) its state projection.
 
 ## Conventions any new work MUST follow
 
@@ -92,30 +93,29 @@ the constructor) with no special case. `parseAssembly` (the stretch goal) was no
 **Acceptance.** Both files generate and type-check; `save()` emits both. (Stretch: assembly
 round-trips.) Validates the wiring half of H3.
 
-## Step 2 — T-function (Show) node + UiStateFlow projection (Rung 3, H3 projection + H7) — done
+## Step 2 — T-function (Show) attachment + UiStateFlow projection (Rung 3, H3 projection + H7) — done
 
 **Goal.** Introduce the T-function and the derived `<Name>UiStateFlow`. The projection is
 undemonstrable without a `Show`-bound port, so it is sequenced here, right after the assembly.
 
-**Note (as implemented).** A distinct leaf node type, `TFunction`, alongside `Action` (registered
-in the add-node menu, not in `ActionLayout.parse`'s dispatcher — see `docs/example-rung3.md` for
-why it can't have a parser). An earlier pass tried a marker/attribute on `Action` instead
-(`isTFunction: MutableState<Boolean>`); both worked and passed identical tests, but the node-type
-version was chosen to keep T-functions a first-class part of the node catalog rather than a
-toggle — see `docs/example-rung3.md` for the full write-up, including two real mistakes
-`checkHighlighting` caught: `emitSelfWhenHaveValue` can't be an extension function (fully-qualified
-calls with no imports can't use receiver-dot syntax), and the nested `Screen` sealed interface
-needs its own explicit type parameter list (nested, non-`inner` types don't inherit the enclosing
-class's). The `<Name>UiStateFlow` instance is threaded as the assembly's own defaulted *first*
-parameter rather than a body-local `val`, since default-parameter expressions can only reference
-earlier parameters, never body locals — this also gives it a D5 override seam for free.
+**Note (as implemented).** Neither a marker/attribute on the leaf nor a distinct node type (both
+were tried and dropped — see `docs/example-rung3.md`'s design-history note). Instead,
+`ActionDefinition.tFunctionPorts: MutableState<Set<String>>` is a "known list" of port names,
+attached at the definition level; the body tree (`Action` and every other node type) stays
+completely unaware of T-functions. `com.genovich.components.Show` is recognized via a small
+standalone `Show.parse` utility (`actions/Show.kt`, not an `ActionLayout.UExpressionParser` — it
+recognizes an assembly-plane expression, which has no place in `ActionLayout.parse`'s dispatcher),
+scaffolding for a future `parseAssembly` that isn't wired up yet. The `<Name>UiStateFlow` instance
+is threaded as the assembly's own defaulted *first* parameter rather than a body-local `val`, since
+default-parameter expressions can only reference earlier parameters, never body locals — this also
+gives it a D5 override seam for free. Customizable/multi-kind T-function recognition is deferred as
+an open hypothesis (design.md §5.1), not implemented.
 
 **Tasks.**
 - Grow the `Components` stub with `UiState`, `Show`, `StateFlow`/`MutableStateFlow`, `combine`,
   `emitSelfWhenHaveValue` (minimal signatures for resolution — see the reference `components` repo).
-- Model a port as a **T-function** (a leaf whose assembly default is `Show(flow)`). Simplest:
-  a marker/attribute on the leaf, or a distinct `TFunction` node. At the function level it still
-  renders/generates as a leaf call; the T-ness only affects the assembly.
+- Model a port as a **T-function** (a leaf whose assembly default is `Show(flow)`). At the function
+  level it still renders/generates as a leaf call; the T-ness only affects the assembly.
 - In `generateAssembly()`: a T-function port gets a default `= com.genovich.components.Show(<Name>UiStateFlow.<port>Flow)`.
 - Generate `<Name>UiStateFlow`: a class mirroring the function tree, `combine`-ing each
   T-function's flow, wrapped in a sealed "which screen is live" enumeration (design.md §3.3, §5.2).
@@ -124,8 +124,9 @@ earlier parameters, never body locals — this also gives it a D5 override seam 
 **Tests.** Assembly with a `Show` default type-checks; the `UiStateFlow` class type-checks and its
 sealed wrapper has one case per T-function.
 
-**Acceptance.** T-function ports render distinctly (glyph is out of scope for the engine tests),
-generate `Show` defaults, and produce a compiling `UiStateFlow`. Validates H3 projection + H7.
+**Acceptance.** T-function ports render distinctly (a checkbox per port in `ActionDefinition`'s own
+`Render`; a dedicated T glyph on the canvas is out of scope for the engine tests), generate `Show`
+defaults, and produce a compiling `UiStateFlow`. Validates H3 projection + H7.
 
 ## Step 3 — Annotations + checksum (Rung 4 → §6 rung 3, H4)
 

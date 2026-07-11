@@ -490,6 +490,24 @@ that emits `UiState(input, callback)` and suspends until the callback returns. A
 level it is indistinguishable from any other port; in the *assembled* view a port bound to
 `Show(flow)` takes the T glyph and is the source of one leaf in the state projection (§3.3).
 
+**Open question — customizable/multiple T-function recognition.** The current implementation
+(rung 2 step 2, `docs/example-rung3.md`) hardcodes `com.genovich.components.Show` as the *only*
+recognized T-function binding (`actions/Show.kt`'s `Show.SHOW_FQN`); a port is a T-function purely
+by being named in `ActionDefinition.tFunctionPorts`, a "known list" attached at the definition
+level rather than baked into a leaf node's type or a flag. Multiple T-function *ports* per
+definition are already supported (`generateAssembly`/`generateUiStateFlow` iterate the whole set).
+Two things remain open, deferred until a concrete rung needs them:
+
+- **Customizable recognition** — per §2.2's "node palette is open/extensible, not a closed
+  vocabulary" goal, should the set of recognized boundary-binding components be a registry
+  (matched by FQN, the way node parsers match their own FQN) rather than one hardcoded name?
+  Nothing today needs a second kind, so this hasn't been validated against a real case.
+- **Multiple T-function *kinds*** — if a project ever needs more than one boundary-binding shape
+  (not just more than one T-function *port*, which already works), how would their flows combine
+  in the `UiStateFlow` projection? One sealed `Screen` per kind? A single `Screen` with cases
+  spanning all kinds (today's design, extended)? Undecided — no second kind exists yet to design
+  against.
+
 ### 5.2 `parallel` / race nodes *(Decision D13)*
 
 `parallel(input, f1, f2, …)` races its lanes on the same `input`; the **first** to complete

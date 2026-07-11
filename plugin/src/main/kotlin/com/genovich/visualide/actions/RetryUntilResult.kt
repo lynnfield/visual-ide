@@ -56,7 +56,7 @@ data class RetryUntilResult(
     override fun inferType(
         input: String,
         fresh: () -> String,
-        ports: MutableMap<String, ActionLayout.PortSignature>,
+        ports: MutableMap<String, Pair<String, String>>,
     ): String = body.value?.inferType(input, fresh, ports) ?: TYPE_NOTHING
 
     companion object : ActionLayout.UExpressionParser<RetryUntilResult> {

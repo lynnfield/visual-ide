@@ -29,8 +29,8 @@ data class Action(
     override fun inferType(
         input: String,
         fresh: () -> String,
-        ports: MutableMap<String, ActionLayout.PortSignature>,
-    ): String = ports.getOrPut(name.value) { ActionLayout.PortSignature(input, fresh()) }.outputType
+        ports: MutableMap<String, Pair<String, String>>,
+    ): String = ports.getOrPut(name.value) { input to fresh() }.second
 
     companion object : ActionLayout.UExpressionParser<Action> {
         override fun parse(expression: UExpression): Result<Action> = runCatching {

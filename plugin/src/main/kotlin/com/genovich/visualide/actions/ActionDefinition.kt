@@ -2,11 +2,13 @@ package com.genovich.visualide.actions
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.genovich.visualide.types.TYPE_NOTHING
 import com.genovich.visualide.ui.AddNewLayoutButton
@@ -14,6 +16,8 @@ import com.genovich.visualide.ui.TextBlock
 import com.genovich.visualide.ui.step
 import com.intellij.openapi.diagnostic.getOrLogException
 import com.intellij.util.asSafely
+import org.jetbrains.jewel.ui.component.Checkbox
+import org.jetbrains.jewel.ui.component.Text
 import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstanceOrNull
 import org.jetbrains.kotlin.utils.findIsInstanceAnd
 import org.jetbrains.uast.UBlockExpression
@@ -27,15 +31,26 @@ import kotlin.uuid.Uuid
 data class ActionDefinition(
     val name: MutableState<String>,
     val body: MutableState<ActionLayout?> = mutableStateOf(null),
+    /**
+     * Names of derived ports (see [signature]) wired via [Show] (design.md §1.6, §5.1) instead of
+     * a required parameter. Attached here, at the definition level, rather than on whichever leaf
+     * node happens to produce the port — the body tree stays 100% unaware of T-functions (matches
+     * "invisible at the function level"), and this set is the sole "known list of T-functions" for
+     * this definition. See docs/example-rung3.md for why this replaced two earlier designs (a
+     * boolean flag on the leaf, then a distinct leaf node type).
+     */
+    val tFunctionPorts: MutableState<Set<String>> = mutableStateOf(emptySet()),
     val id: Uuid = Uuid.random(),
 ) {
     constructor(
         name: String,
         body: ActionLayout? = null,
+        tFunctionPorts: Set<String> = emptySet(),
         id: Uuid = Uuid.random(),
     ) : this(
         name = mutableStateOf(name),
         body = mutableStateOf(body),
+        tFunctionPorts = mutableStateOf(tFunctionPorts),
         id = id,
     )
 
@@ -44,34 +59,43 @@ data class ActionDefinition(
         Column(modifier = modifier.width(IntrinsicSize.Max)) {
             TextBlock(name) // todo should I allow self-delete???
             val paddings = Modifier.padding(horizontal = step)
+            val ports = signature().ports.keys
+            if (ports.isNotEmpty()) {
+                Column(modifier = paddings) {
+                    ports.forEach { portName ->
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Checkbox(
+                                checked = portName in tFunctionPorts.value,
+                                onCheckedChange = { checked ->
+                                    tFunctionPorts.value = if (checked) {
+                                        tFunctionPorts.value + portName
+                                    } else {
+                                        tFunctionPorts.value - portName
+                                    }
+                                },
+                            )
+                            Text("`$portName` is a T-function")
+                        }
+                    }
+                }
+            }
             body.value?.Render(onRemove = { body.value = null }, modifier = paddings)
                 ?: AddNewLayoutButton(modifier = paddings, onAdd = body::value::set)
         }
     }
 
     /**
-     * Structural type inference (rung 1 / H2), run once and shared by [generate] and
-     * [generateAssembly]: threads type variables through the body so each port gets its own
+     * Structural type inference (rung 1 / H2), run once and shared by [generate], [generateAssembly],
+     * and [generateUiStateFlow]: threads type variables through the body so each port gets its own
      * `Action<in, out>` types instead of a shared placeholder `<Input, Output>`.
      */
     fun signature(): Signature {
-        val ports = mutableMapOf<String, ActionLayout.PortSignature>()
+        val ports = mutableMapOf<String, Pair<String, String>>()
         val typeParameters = mutableListOf(INPUT_TYPE)
         val fresh = { "T${typeParameters.size}".also(typeParameters::add) }
         val outputType = body.value?.inferType(INPUT_TYPE, fresh, ports) ?: TYPE_NOTHING
         return Signature(typeParameters, ports, outputType)
     }
-
-    /** Type parameters (in [Signature.typeParameters] order) referenced by [tFunctionPorts]. */
-    private fun uiStateFlowTypeParameters(
-        signature: Signature,
-        tFunctionPorts: Map<String, ActionLayout.PortSignature>,
-    ): String {
-        val used = tFunctionPorts.values.flatMapTo(mutableSetOf()) { listOf(it.inputType, it.outputType) }
-        return signature.typeParameters.filter { it in used }.joinToString(separator = ", ")
-    }
-
-    private fun screenCaseName(portName: String): String = portName.replaceFirstChar(Char::uppercaseChar)
 
     @OptIn(ExperimentalUuidApi::class)
     fun generate(): String {
@@ -82,8 +106,8 @@ data class ActionDefinition(
             if (signature.ports.isEmpty()) {
                 ""
             } else {
-                signature.ports.entries.joinToString(separator = ",\n", prefix = "\n") { (portName, port) ->
-                    "val `$portName`: $COM_GENOVICH_COMPONENTS_ACTION<${port.inputType}, ${port.outputType}>"
+                signature.ports.entries.joinToString(separator = ",\n", prefix = "\n") { (portName, io) ->
+                    "val `$portName`: $COM_GENOVICH_COMPONENTS_ACTION<${io.first}, ${io.second}>"
                 }
             }
 
@@ -98,30 +122,31 @@ data class ActionDefinition(
 
     /**
      * The dependency-plane factory (design.md §3.2): a function taking every leaf port as a
-     * required parameter and constructing this definition's class. A T-function port
-     * (design.md §1.6, §5.1) instead gets a `Show(flow)` default sourced from a
-     * `<Name>UiStateFlow` instance (design.md §3.3, [generateUiStateFlow]) — itself a defaulted
-     * first parameter (D5 override seam), so callers can supply their own instance to observe the
-     * boundary state, or rely on the default.
+     * parameter and constructing this definition's class. A port named in [tFunctionPorts] gets a
+     * `Show(flow)` default instead of a required parameter, sourced from a [generateUiStateFlow]
+     * instance threaded in as this function's own defaulted *first* parameter (a Kotlin default
+     * expression can only reference earlier parameters, never a body-local `val` — and the class
+     * can't be a singleton `object` since ports are still abstract type variables at this rung),
+     * which also gives it a D5 override seam for free.
      */
     fun generateAssembly(): String {
         val signature = signature()
         val typeParameters = signature.typeParameters.joinToString(separator = ", ")
-        val tFunctionPorts = signature.ports.filterValues { it.isTFunction }
+        val tFunctionPortNames = signature.ports.keys.filter { it in tFunctionPorts.value }
         val uiStateFlowName = "${name.value}$UI_STATE_FLOW_SUFFIX"
 
         val parameterLines = buildList {
-            if (tFunctionPorts.isNotEmpty()) {
-                val uiStateFlowTypeParameters = uiStateFlowTypeParameters(signature, tFunctionPorts)
+            if (tFunctionPortNames.isNotEmpty()) {
+                val uiStateFlowTypeParameters = uiStateFlowTypeParameters(signature, tFunctionPortNames)
                 add("    `$UI_STATE_FLOW_PARAM_NAME`: `$uiStateFlowName`<$uiStateFlowTypeParameters> = `$uiStateFlowName`()")
             }
-            signature.ports.forEach { (portName, port) ->
-                val default = if (port.isTFunction) {
-                    " = $COM_GENOVICH_COMPONENTS_SHOW(`$UI_STATE_FLOW_PARAM_NAME`.`$portName$FLOW_SUFFIX`)"
+            signature.ports.forEach { (portName, io) ->
+                val default = if (portName in tFunctionPorts.value) {
+                    " = ${Show.SHOW_FQN}(`$UI_STATE_FLOW_PARAM_NAME`.`$portName$FLOW_SUFFIX`)"
                 } else {
                     ""
                 }
-                add("    `$portName`: $COM_GENOVICH_COMPONENTS_ACTION<${port.inputType}, ${port.outputType}>$default")
+                add("    `$portName`: $COM_GENOVICH_COMPONENTS_ACTION<${io.first}, ${io.second}>$default")
             }
         }
         val parameterDeclarations =
@@ -143,21 +168,22 @@ data class ActionDefinition(
     }
 
     /**
-     * The state projection (design.md §3.3): a class mirroring the T-function ports, one
-     * `MutableStateFlow<UiState<in, out>?>` per port, `combine`d into a sealed "which screen is
-     * live" `Screen` (one case per T-function). `null` when there are no T-function ports —
+     * The state projection (design.md §3.3): a class mirroring the [tFunctionPorts], one
+     * `MutableStateFlow<UiState<in, out>?>` per T-function port, `combine`d into a sealed "which
+     * screen is live" `Screen` (one case per T-function). `null` when [tFunctionPorts] is empty —
      * nothing to project, so no file is generated (see [com.genovich.visualide.toolWindow]'s
      * `save()`, which skips writing the third file in that case).
      */
     fun generateUiStateFlow(): String? {
         val signature = signature()
-        val tFunctionPorts = signature.ports.filterValues { it.isTFunction }
-        if (tFunctionPorts.isEmpty()) return null
+        val tFunctionPortNames = signature.ports.keys.filter { it in tFunctionPorts.value }
+        if (tFunctionPortNames.isEmpty()) return null
 
-        val typeParameters = uiStateFlowTypeParameters(signature, tFunctionPorts)
+        val typeParameters = uiStateFlowTypeParameters(signature, tFunctionPortNames)
 
-        val flowDeclarations = tFunctionPorts.entries.joinToString(separator = "\n\n") { (portName, port) ->
-            """    val `$portName$FLOW_SUFFIX`: $COM_GENOVICH_COMPONENTS_MUTABLE_STATE_FLOW<$COM_GENOVICH_COMPONENTS_UI_STATE<${port.inputType}, ${port.outputType}>?> =
+        val flowDeclarations = tFunctionPortNames.joinToString(separator = "\n\n") { portName ->
+            val (inputType, outputType) = signature.ports.getValue(portName)
+            """    val `$portName$FLOW_SUFFIX`: $COM_GENOVICH_COMPONENTS_MUTABLE_STATE_FLOW<$COM_GENOVICH_COMPONENTS_UI_STATE<$inputType, $outputType>?> =
             |        $COM_GENOVICH_COMPONENTS_MUTABLE_STATE_FLOW(null)"""
                 .trimMargin()
         }
@@ -165,11 +191,12 @@ data class ActionDefinition(
         // Screen is nested for readability, but Kotlin's nested (non-inner; sealed interfaces
         // can't be `inner`) types don't inherit the enclosing class's type parameters — it must
         // redeclare its own, matching the outer class's list so callers pass the same types.
-        val screenCases = tFunctionPorts.entries.joinToString(separator = "\n") { (portName, port) ->
-            "        data class `${screenCaseName(portName)}`<$typeParameters>(val state: $COM_GENOVICH_COMPONENTS_UI_STATE<${port.inputType}, ${port.outputType}>) : Screen<$typeParameters>"
+        val screenCases = tFunctionPortNames.joinToString(separator = "\n") { portName ->
+            val (inputType, outputType) = signature.ports.getValue(portName)
+            "        data class `${screenCaseName(portName)}`<$typeParameters>(val state: $COM_GENOVICH_COMPONENTS_UI_STATE<$inputType, $outputType>) : Screen<$typeParameters>"
         }
 
-        val combineArguments = tFunctionPorts.keys.joinToString(separator = ",\n            ") { portName ->
+        val combineArguments = tFunctionPortNames.joinToString(separator = ",\n            ") { portName ->
             "$COM_GENOVICH_COMPONENTS_EMIT_SELF_WHEN_HAVE_VALUE(`$portName$FLOW_SUFFIX`) { Screen.`${screenCaseName(portName)}`(it) }"
         }
 
@@ -189,17 +216,24 @@ data class ActionDefinition(
         """.trimIndent()
     }
 
+    /** Type parameters (in [Signature.typeParameters] order) referenced by [tFunctionPortNames]. */
+    private fun uiStateFlowTypeParameters(signature: Signature, tFunctionPortNames: Collection<String>): String {
+        val used = tFunctionPortNames.flatMapTo(mutableSetOf()) { signature.ports.getValue(it).toList() }
+        return signature.typeParameters.filter { it in used }.joinToString(separator = ", ")
+    }
+
+    private fun screenCaseName(portName: String): String = portName.replaceFirstChar(Char::uppercaseChar)
+
     /** [typeParameters] in declaration order (`Input, T1..Tn`); [ports] preserve first-use order. */
     data class Signature(
         val typeParameters: List<String>,
-        val ports: Map<String, ActionLayout.PortSignature>,
+        val ports: Map<String, Pair<String, String>>,
         val outputType: String,
     )
 
     companion object {
         const val INVOKE_METHOD_NAME = "invoke"
         const val COM_GENOVICH_COMPONENTS_ACTION = "com.genovich.components.Action"
-        const val COM_GENOVICH_COMPONENTS_SHOW = "com.genovich.components.Show"
         const val COM_GENOVICH_COMPONENTS_MUTABLE_STATE_FLOW = "com.genovich.components.MutableStateFlow"
         const val COM_GENOVICH_COMPONENTS_STATE_FLOW = "com.genovich.components.StateFlow"
         const val COM_GENOVICH_COMPONENTS_UI_STATE = "com.genovich.components.UiState"
