@@ -59,7 +59,7 @@ data class Passing(
     override fun inferType(
         input: String,
         fresh: () -> String,
-        ports: MutableMap<String, ActionLayout.PortSignature>,
+        ports: MutableMap<String, Pair<String, String>>,
     ): String =
         body.fold(input) { previousType, layout -> layout.inferType(previousType, fresh, ports) }
 

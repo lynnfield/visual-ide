@@ -15,7 +15,6 @@ import com.genovich.visualide.actions.ActionLayout
 import com.genovich.visualide.actions.Passing
 import com.genovich.visualide.actions.RepeatWhileActive
 import com.genovich.visualide.actions.RetryUntilResult
-import com.genovich.visualide.actions.TFunction
 import org.jetbrains.jewel.foundation.ExperimentalJewelApi
 import org.jetbrains.jewel.ui.component.IconActionButton
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
@@ -36,7 +35,6 @@ fun AddNewLayoutButton(
                 ContextMenuItem("Retry until result") { onAdd(RetryUntilResult()) },
                 ContextMenuItem("Passing") { onAdd(Passing()) },
                 ContextMenuItem("Action") { onAdd(Action()) },
-                ContextMenuItem("T-function") { onAdd(TFunction()) },
             )
         },
     ) {

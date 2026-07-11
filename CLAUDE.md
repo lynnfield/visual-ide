@@ -103,17 +103,11 @@ types, each of which is simultaneously:
 3. a structural type-inference step (`inferType` — mints per-port type variables so generated
    code actually type-checks instead of sharing one placeholder `<Input, Output>`), and
 4. a UAST parser (`companion object : ActionLayout.UExpressionParser<T>`, `parse`) that recognizes
-   its own generated shape in source and reconstructs the model from it — with one deliberate
-   exception, `TFunction` (below), whose `generate()` is indistinguishable from `Action`'s and so
-   cannot have a parser without creating ambiguous-match errors in the dispatcher.
+   its own generated shape in source and reconstructs the model from it.
 
 Current node types, each in its own file:
 
 - `Action` — a leaf port call (`` `name`(input) ``).
-- `TFunction` — a leaf port call, identical to `Action` at the function level, but a T-function
-  (design.md §1.6, §5.1): its assembly default is `Show(flow)` instead of a required parameter,
-  and it contributes a flow to the generated `<Name>UiStateFlow` projection. No parser (see above);
-  a reparsed T-function leaf always comes back as a plain `Action` — see `docs/example-rung3.md`.
 - `Passing` — a linear pipeline (`.let { }` chain); models the Sequence operator.
 - `RepeatWhileActive` — an infinite loop (`repeatWhileActive { }`); returns `Nothing`.
 - `RetryUntilResult` — a decorator that retries its body until it returns without throwing.
@@ -128,8 +122,22 @@ guaranteed to parse. This is a deliberate scope boundary (see `docs/example-rung
 
 `ActionDefinition` is the top-level container (maps to a generated Kotlin class): it holds a
 name, a mutable `body: ActionLayout?`, derives constructor dependency ports automatically by
-walking the body's leaf `Action`s, and threads type variables through `inferType` to produce a
-type-checking generated class.
+walking the body's leaf `Action`s, threads type variables through `inferType` to produce a
+type-checking generated class, and (`tFunctionPorts: MutableState<Set<String>>`) attaches a
+"known list" of which derived ports are T-functions (design.md §1.6, §5.1) — see "T-function
+recognition" below.
+
+### T-function recognition (`actions/Show.kt`)
+
+A port is a T-function purely by being named in `ActionDefinition.tFunctionPorts` — attached at
+the *definition* level, not baked into a leaf node's type or a flag (two earlier designs tried
+both; see `docs/example-rung3.md`). `com.genovich.components.Show` is the only recognized
+T-function binding, matched by `Show.parse` — a standalone recognizer, **not** an
+`ActionLayout.UExpressionParser` and not registered in `ActionLayout.parse`'s dispatcher, since
+`Show` marks a *dependency-plane* (assembly) default value, not a function-body node. Nothing calls
+`Show.parse` yet; it's scaffolding for a future `parseAssembly`. Whether T-function recognition
+should be customizable (a registry, not one hardcoded FQN) or support multiple T-function *kinds*
+is an open hypothesis — see design.md §5.1's "Open question" note — not implemented.
 
 ### Round-trip contract
 
@@ -148,10 +156,10 @@ in lockstep, and vice versa — they are two halves of one contract, verified by
 - **Rung 2 / Step 1 (done)** — assembly file generation (`ActionDefinition.generateAssembly()`),
   the wiring half of H3. See `docs/example-rung2.md`. `parseAssembly` (dependency-plane round-trip)
   is still open.
-- **Rung 2 / Step 2 (done)** — T-function ports, a distinct leaf node type (`TFunction`, no
-  parser — see `docs/example-rung3.md`), and the derived `<Name>UiStateFlow` projection
-  (`ActionDefinition.generateUiStateFlow()`), the projection half of H3, plus H7. See
-  `docs/example-rung3.md`.
+- **Rung 2 / Step 2 (done)** — T-function ports (`ActionDefinition.tFunctionPorts`, recognized via
+  `com.genovich.components.Show` — see "T-function recognition" above) and the derived
+  `<Name>UiStateFlow` projection (`ActionDefinition.generateUiStateFlow()`), the projection half of
+  H3, plus H7. See `docs/example-rung3.md`.
 - **Not yet implemented**: `@Node`/`@Diagram` annotations and checksums, the engine IR /
   `KotlinAnalysis` host-abstraction boundary, value-plumbing nodes
   (Tuple/Construct/Copy/Project/Select/Guard/Not), Branch, and Parallel. See

@@ -4,7 +4,6 @@ import com.genovich.visualide.actions.Action
 import com.genovich.visualide.actions.ActionDefinition
 import com.genovich.visualide.actions.Passing
 import com.genovich.visualide.actions.RepeatWhileActive
-import com.genovich.visualide.actions.TFunction
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.roots.ContentEntry
@@ -20,11 +19,12 @@ import kotlin.uuid.ExperimentalUuidApi
  *
  * `ActionDefinition.generateAssembly()` produces the dependency-plane factory for `GuessLoop`:
  * a function taking every leaf port as a parameter and constructing the `GuessLoop` class
- * (design.md §3.2). `readGuess` is a T-function (rung 2 step 2, design.md §1.6/§5.1), so it's
- * defaulted to `Show(uiStateFlow.readGuessFlow)` rather than required; `checkGuess` stays a plain
- * required port. [testAssemblyTypeChecks] proves the three generated files — the function class,
- * its assembly, and its state projection — type-check together, the same way
- * [GuessLoopRoundTripTest] proves the function file alone type-checks (H2).
+ * (design.md §3.2). `readGuess` is attached as a T-function (rung 2 step 2, design.md §1.6/§5.1)
+ * via `ActionDefinition.tFunctionPorts` — a definition-level "known list," not a property of the
+ * `readGuess` leaf itself — so it's defaulted to `Show(uiStateFlow.readGuessFlow)` rather than
+ * required; `checkGuess` stays a plain required port. [testAssemblyTypeChecks] proves the three
+ * generated files — the function class, its assembly, and its state projection — type-check
+ * together, the same way [GuessLoopRoundTripTest] proves the function file alone type-checks (H2).
  */
 @OptIn(ExperimentalUuidApi::class)
 class GuessLoopAssemblyTest : BasePlatformTestCase() {
@@ -37,8 +37,9 @@ class GuessLoopAssemblyTest : BasePlatformTestCase() {
     private fun guessLoopDefinition() = ActionDefinition(
         name = "GuessLoop",
         body = RepeatWhileActive(
-            Passing(listOf(TFunction("readGuess"), Action("checkGuess"))),
+            Passing(listOf(Action("readGuess"), Action("checkGuess"))),
         ),
+        tFunctionPorts = setOf("readGuess"),
     )
 
     fun testGeneratesTypedFactory() {
@@ -57,7 +58,7 @@ class GuessLoopAssemblyTest : BasePlatformTestCase() {
             .describedAs("takes checkGuess as a required (non-defaulted) parameter")
             .contains("`checkGuess`: com.genovich.components.Action<T1, T2>")
         assertThat(code)
-            .describedAs("checkGuess has no default — it's not a T-function")
+            .describedAs("checkGuess has no default — it's not attached as a T-function")
             .doesNotContain("`checkGuess`: com.genovich.components.Action<T1, T2> =")
         assertThat(code)
             .describedAs("returns the GuessLoop type")
