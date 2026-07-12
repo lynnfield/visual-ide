@@ -40,7 +40,7 @@ class ShowTest : BasePlatformTestCase() {
         body = RepeatWhileActive(
             Passing(listOf(Action("readGuess"), Action("checkGuess"))),
         ),
-        tFunctionPorts = setOf("readGuess"),
+        portDefaults = mapOf("readGuess" to Show),
     ).generateAssembly()
 
     fun testRecognizesGeneratedShowDefault() {
