@@ -123,21 +123,23 @@ guaranteed to parse. This is a deliberate scope boundary (see `docs/example-rung
 `ActionDefinition` is the top-level container (maps to a generated Kotlin class): it holds a
 name, a mutable `body: ActionLayout?`, derives constructor dependency ports automatically by
 walking the body's leaf `Action`s, threads type variables through `inferType` to produce a
-type-checking generated class, and (`tFunctionPorts: MutableState<Set<String>>`) attaches a
-"known list" of which derived ports are T-functions (design.md §1.6, §5.1) — see "T-function
-recognition" below.
+type-checking generated class, and (`portDefaults: MutableState<Map<String, PortDefault>>`)
+attaches each derived port's assembly-plane default, when it has one other than "required" (design.md
+§1.6, §5.1) — see "T-function recognition" below.
 
 ### T-function recognition (`actions/Show.kt`)
 
-A port is a T-function purely by being named in `ActionDefinition.tFunctionPorts` — attached at
-the *definition* level, not baked into a leaf node's type or a flag (two earlier designs tried
-both; see `docs/example-rung3.md`). `com.genovich.components.Show` is the only recognized
-T-function binding, matched by `Show.parse` — a standalone recognizer, **not** an
-`ActionLayout.UExpressionParser` and not registered in `ActionLayout.parse`'s dispatcher, since
-`Show` marks a *dependency-plane* (assembly) default value, not a function-body node. Nothing calls
-`Show.parse` yet; it's scaffolding for a future `parseAssembly`. Whether T-function recognition
-should be customizable (a registry, not one hardcoded FQN) or support multiple T-function *kinds*
-is an open hypothesis — see design.md §5.1's "Open question" note — not implemented.
+A port is a T-function purely by its `ActionDefinition.portDefaults` entry being `Show` — attached
+at the *definition* level, not baked into a leaf node's type or a flag (two earlier designs tried
+both; see `docs/example-rung3.md`). `PortDefault` is a sealed interface (`ActionDefinition.kt`)
+with `Show` (`actions/Show.kt`) as its only implementation today — `com.genovich.components.Show`
+is the only recognized T-function binding, matched by `Show.parse`, a standalone recognizer,
+**not** an `ActionLayout.UExpressionParser` and not registered in `ActionLayout.parse`'s
+dispatcher, since `Show` marks a *dependency-plane* (assembly) default value, not a function-body
+node. Nothing calls `Show.parse` yet; it's scaffolding for a future `parseAssembly`. Whether
+T-function recognition should be customizable (a registry, not one hardcoded FQN) or support
+multiple T-function *kinds* is an open hypothesis — see design.md §5.1's "Open question" note —
+not implemented.
 
 ### Round-trip contract
 
@@ -156,7 +158,7 @@ in lockstep, and vice versa — they are two halves of one contract, verified by
 - **Rung 2 / Step 1 (done)** — assembly file generation (`ActionDefinition.generateAssembly()`),
   the wiring half of H3. See `docs/example-rung2.md`. `parseAssembly` (dependency-plane round-trip)
   is still open.
-- **Rung 2 / Step 2 (done)** — T-function ports (`ActionDefinition.tFunctionPorts`, recognized via
+- **Rung 2 / Step 2 (done)** — T-function ports (`ActionDefinition.portDefaults`, recognized via
   `com.genovich.components.Show` — see "T-function recognition" above) and the derived
   `<Name>UiStateFlow` projection (`ActionDefinition.generateUiStateFlow()`), the projection half of
   H3, plus H7. See `docs/example-rung3.md`.

@@ -4,6 +4,7 @@ import com.genovich.visualide.actions.Action
 import com.genovich.visualide.actions.ActionDefinition
 import com.genovich.visualide.actions.Passing
 import com.genovich.visualide.actions.RepeatWhileActive
+import com.genovich.visualide.actions.Show
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.roots.ContentEntry
@@ -19,11 +20,11 @@ import kotlin.uuid.ExperimentalUuidApi
  * of H3, plus H7 (a `Show`-bound port derives a `UiStateFlow` leaf).
  *
  * `ActionDefinition.generateUiStateFlow()` produces `GuessLoopUiStateFlow`: one
- * `MutableStateFlow<UiState<in, out>?>` per port named in `ActionDefinition.tFunctionPorts`,
- * `combine`d into a sealed "which screen is live" `Screen` with one case per T-function. `null`
- * when `tFunctionPorts` is empty — nothing to project. [testUiStateFlowTypeChecks] proves the
- * generated class type-checks, the same way [GuessLoopAssemblyTest.testAssemblyTypeChecks] proves
- * the assembly does.
+ * `MutableStateFlow<UiState<in, out>?>` per port whose `ActionDefinition.portDefaults` entry is
+ * `Show`, `combine`d into a sealed "which screen is live" `Screen` with one case per T-function.
+ * `null` when no port has a `Show` entry — nothing to project. [testUiStateFlowTypeChecks] proves
+ * the generated class type-checks, the same way [GuessLoopAssemblyTest.testAssemblyTypeChecks]
+ * proves the assembly does.
  */
 @OptIn(ExperimentalUuidApi::class)
 class GuessLoopUiStateFlowTest : BasePlatformTestCase() {
@@ -38,7 +39,7 @@ class GuessLoopUiStateFlowTest : BasePlatformTestCase() {
         body = RepeatWhileActive(
             Passing(listOf(Action("readGuess"), Action("checkGuess"))),
         ),
-        tFunctionPorts = setOf("readGuess"),
+        portDefaults = mapOf("readGuess" to Show),
     )
 
     fun testGeneratesUiStateFlow() {
@@ -76,7 +77,7 @@ class GuessLoopUiStateFlowTest : BasePlatformTestCase() {
         )
 
         assertThat(definition.generateUiStateFlow())
-            .describedAs("nothing to project when tFunctionPorts is empty")
+            .describedAs("nothing to project when no port's default is Show")
             .isNull()
     }
 

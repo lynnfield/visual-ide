@@ -32,25 +32,26 @@ data class ActionDefinition(
     val name: MutableState<String>,
     val body: MutableState<ActionLayout?> = mutableStateOf(null),
     /**
-     * Names of derived ports (see [signature]) wired via [Show] (design.md §1.6, §5.1) instead of
-     * a required parameter. Attached here, at the definition level, rather than on whichever leaf
+     * Derived ports (see [signature]) mapped to their assembly-plane default, when they have one
+     * other than "required". Attached here, at the definition level, rather than on whichever leaf
      * node happens to produce the port — the body tree stays 100% unaware of T-functions (matches
-     * "invisible at the function level"), and this set is the sole "known list of T-functions" for
-     * this definition. See docs/example-rung3.md for why this replaced two earlier designs (a
-     * boolean flag on the leaf, then a distinct leaf node type).
+     * "invisible at the function level"). A port is a T-function exactly when its entry here is
+     * [Show] (`portDefaults.value[portName] == Show`) — see docs/example-rung3.md for why this
+     * replaced two earlier designs (a boolean flag on the leaf, then a distinct leaf node type) and
+     * a plain `Set<String>` before this.
      */
-    val tFunctionPorts: MutableState<Set<String>> = mutableStateOf(emptySet()),
+    val portDefaults: MutableState<Map<String, PortDefault>> = mutableStateOf(emptyMap()),
     val id: Uuid = Uuid.random(),
 ) {
     constructor(
         name: String,
         body: ActionLayout? = null,
-        tFunctionPorts: Set<String> = emptySet(),
+        portDefaults: Map<String, PortDefault> = emptyMap(),
         id: Uuid = Uuid.random(),
     ) : this(
         name = mutableStateOf(name),
         body = mutableStateOf(body),
-        tFunctionPorts = mutableStateOf(tFunctionPorts),
+        portDefaults = mutableStateOf(portDefaults),
         id = id,
     )
 
@@ -65,12 +66,12 @@ data class ActionDefinition(
                     ports.forEach { portName ->
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Checkbox(
-                                checked = portName in tFunctionPorts.value,
+                                checked = portDefaults.value[portName] == Show,
                                 onCheckedChange = { checked ->
-                                    tFunctionPorts.value = if (checked) {
-                                        tFunctionPorts.value + portName
+                                    portDefaults.value = if (checked) {
+                                        portDefaults.value + (portName to Show)
                                     } else {
-                                        tFunctionPorts.value - portName
+                                        portDefaults.value - portName
                                     }
                                 },
                             )
@@ -122,17 +123,17 @@ data class ActionDefinition(
 
     /**
      * The dependency-plane factory (design.md §3.2): a function taking every leaf port as a
-     * parameter and constructing this definition's class. A port named in [tFunctionPorts] gets a
-     * `Show(flow)` default instead of a required parameter, sourced from a [generateUiStateFlow]
-     * instance threaded in as this function's own defaulted *first* parameter (a Kotlin default
-     * expression can only reference earlier parameters, never a body-local `val` — and the class
-     * can't be a singleton `object` since ports are still abstract type variables at this rung),
-     * which also gives it a D5 override seam for free.
+     * parameter and constructing this definition's class. A port whose [portDefaults] entry is
+     * [Show] gets a `Show(flow)` default instead of a required parameter, sourced from a
+     * [generateUiStateFlow] instance threaded in as this function's own defaulted *first* parameter
+     * (a Kotlin default expression can only reference earlier parameters, never a body-local `val`
+     * — and the class can't be a singleton `object` since ports are still abstract type variables
+     * at this rung), which also gives it a D5 override seam for free.
      */
     fun generateAssembly(): String {
         val signature = signature()
         val typeParameters = signature.typeParameters.joinToString(separator = ", ")
-        val tFunctionPortNames = signature.ports.keys.filter { it in tFunctionPorts.value }
+        val tFunctionPortNames = signature.ports.keys.filter { portDefaults.value[it] == Show }
         val uiStateFlowName = "${name.value}$UI_STATE_FLOW_SUFFIX"
 
         val parameterLines = buildList {
@@ -141,7 +142,7 @@ data class ActionDefinition(
                 add("    `$UI_STATE_FLOW_PARAM_NAME`: `$uiStateFlowName`<$uiStateFlowTypeParameters> = `$uiStateFlowName`()")
             }
             signature.ports.forEach { (portName, io) ->
-                val default = if (portName in tFunctionPorts.value) {
+                val default = if (portDefaults.value[portName] == Show) {
                     " = ${Show.SHOW_FQN}(`$UI_STATE_FLOW_PARAM_NAME`.`$portName$FLOW_SUFFIX`)"
                 } else {
                     ""
@@ -168,15 +169,16 @@ data class ActionDefinition(
     }
 
     /**
-     * The state projection (design.md §3.3): a class mirroring the [tFunctionPorts], one
-     * `MutableStateFlow<UiState<in, out>?>` per T-function port, `combine`d into a sealed "which
-     * screen is live" `Screen` (one case per T-function). `null` when [tFunctionPorts] is empty —
-     * nothing to project, so no file is generated (see [com.genovich.visualide.toolWindow]'s
-     * `save()`, which skips writing the third file in that case).
+     * The state projection (design.md §3.3): a class mirroring the T-function ports (those whose
+     * [portDefaults] entry is [Show]), one `MutableStateFlow<UiState<in, out>?>` per port,
+     * `combine`d into a sealed "which screen is live" `Screen` (one case per T-function). `null`
+     * when there are no T-function ports — nothing to project, so no file is generated (see
+     * [com.genovich.visualide.toolWindow]'s `save()`, which skips writing the third file in that
+     * case).
      */
     fun generateUiStateFlow(): String? {
         val signature = signature()
-        val tFunctionPortNames = signature.ports.keys.filter { it in tFunctionPorts.value }
+        val tFunctionPortNames = signature.ports.keys.filter { portDefaults.value[it] == Show }
         if (tFunctionPortNames.isEmpty()) return null
 
         val typeParameters = uiStateFlowTypeParameters(signature, tFunctionPortNames)
@@ -230,6 +232,14 @@ data class ActionDefinition(
         val ports: Map<String, Pair<String, String>>,
         val outputType: String,
     )
+
+    /**
+     * A port's assembly-plane default value (design.md §3.2 point 1, "Wiring"). [Show] is the only
+     * implementation today — see its KDoc — but this is a closed set a future binding kind (e.g.
+     * wiring a port to a child `*Assembly(...)` call) would extend, rather than a bespoke
+     * boolean/name-set concept per binding kind.
+     */
+    sealed interface PortDefault
 
     companion object {
         const val INVOKE_METHOD_NAME = "invoke"

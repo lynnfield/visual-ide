@@ -13,21 +13,22 @@ architecture and what "done" means for the earlier rungs.
 - **Rung 2 / Step 1 (done)** — assembly file generation (`ActionDefinition.generateAssembly()`);
   `save()` emits both `<Name>.kt` and `<Name>Assembly.kt`. Validates the *wiring* half of H3. See
   `docs/example-rung2.md`. `parseAssembly` (the round-trip stretch goal) is still open.
-- **Rung 2 / Step 2 (done)** — T-function ports, attached via `ActionDefinition.tFunctionPorts` (a
-  definition-level "known list" of port names, not a leaf-node flag or type — see
+- **Rung 2 / Step 2 (done)** — T-function ports, attached via `ActionDefinition.portDefaults` (a
+  definition-level `Map<String, PortDefault>`, not a leaf-node flag or type — see
   `docs/example-rung3.md` for why), and the derived `<Name>UiStateFlow` projection
   (`ActionDefinition.generateUiStateFlow()`). `save()` emits the third file when a definition has
   T-function ports. Validates the *projection* half of H3, plus H7. `com.genovich.components.Show`
-  is the only recognized T-function binding (`actions/Show.kt`); customizable/multi-kind
-  recognition is an open hypothesis (design.md §5.1).
+  is the only recognized T-function binding and the only implementation of `PortDefault`
+  (`actions/Show.kt`); customizable/multi-kind recognition is an open hypothesis (design.md §5.1).
 
 The engine lives in `plugin/src/main/kotlin/com/genovich/visualide/actions/`:
 `ActionLayout` (node interface: `Render` / `generate` / `inferType` / `parse`), the nodes
 (`Action`, `Passing`, `RepeatWhileActive`, `RetryUntilResult`, `TodoStub`), `Show` (a recognizer,
 not a node — see Step 2 below), and `ActionDefinition` (the function file: `signature()` +
 `generate()` + `generateAssembly()` + `generateUiStateFlow()` + `parse(UClass)`, plus the
-`tFunctionPorts` state). The tool window's `save()` (`toolWindow/VisualIdeToolWindowFactory.kt`)
-writes the function file, its assembly, and (when applicable) its state projection.
+`portDefaults` state and the `PortDefault` sealed interface). The tool window's `save()`
+(`toolWindow/VisualIdeToolWindowFactory.kt`) writes the function file, its assembly, and (when
+applicable) its state projection.
 
 ## Conventions any new work MUST follow
 
@@ -98,18 +99,23 @@ round-trips.) Validates the wiring half of H3.
 **Goal.** Introduce the T-function and the derived `<Name>UiStateFlow`. The projection is
 undemonstrable without a `Show`-bound port, so it is sequenced here, right after the assembly.
 
-**Note (as implemented).** Neither a marker/attribute on the leaf nor a distinct node type (both
-were tried and dropped — see `docs/example-rung3.md`'s design-history note). Instead,
-`ActionDefinition.tFunctionPorts: MutableState<Set<String>>` is a "known list" of port names,
-attached at the definition level; the body tree (`Action` and every other node type) stays
-completely unaware of T-functions. `com.genovich.components.Show` is recognized via a small
-standalone `Show.parse` utility (`actions/Show.kt`, not an `ActionLayout.UExpressionParser` — it
-recognizes an assembly-plane expression, which has no place in `ActionLayout.parse`'s dispatcher),
-scaffolding for a future `parseAssembly` that isn't wired up yet. The `<Name>UiStateFlow` instance
-is threaded as the assembly's own defaulted *first* parameter rather than a body-local `val`, since
-default-parameter expressions can only reference earlier parameters, never body locals — this also
-gives it a D5 override seam for free. Customizable/multi-kind T-function recognition is deferred as
-an open hypothesis (design.md §5.1), not implemented.
+**Note (as implemented).** Neither a marker/attribute on the leaf, a distinct node type, nor a plain
+`Set<String>` (three shapes were tried and dropped — see `docs/example-rung3.md`'s design-history
+note). Instead, `ActionDefinition.portDefaults: MutableState<Map<String, PortDefault>>` maps each
+derived port to its assembly-plane default; `PortDefault` is a sealed interface with `Show` as its
+only implementation today, so "is a T-function" is a literal identity check
+(`portDefaults.value[portName] == Show`), not set membership. The body tree (`Action` and every
+other node type) stays completely unaware of T-functions. `com.genovich.components.Show` is
+recognized via a small standalone `Show.parse` utility (`actions/Show.kt`, not an
+`ActionLayout.UExpressionParser` — it recognizes an assembly-plane expression, which has no place
+in `ActionLayout.parse`'s dispatcher), scaffolding for a future `parseAssembly` that isn't wired up
+yet. The `<Name>UiStateFlow` instance is threaded as the assembly's own defaulted *first* parameter
+rather than a body-local `val`, since default-parameter expressions can only reference earlier
+parameters, never body locals — this also gives it a D5 override seam for free.
+Customizable/multi-kind T-function recognition is deferred as an open hypothesis (design.md §5.1),
+not implemented; `PortDefault` being a sealed interface (rather than, say, a boolean) leaves room
+for a future binding kind (e.g. wiring a port to a child `*Assembly(...)`) to extend it without
+another reshape.
 
 **Tasks.**
 - Grow the `Components` stub with `UiState`, `Show`, `StateFlow`/`MutableStateFlow`, `combine`,

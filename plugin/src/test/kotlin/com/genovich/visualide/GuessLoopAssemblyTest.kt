@@ -4,6 +4,7 @@ import com.genovich.visualide.actions.Action
 import com.genovich.visualide.actions.ActionDefinition
 import com.genovich.visualide.actions.Passing
 import com.genovich.visualide.actions.RepeatWhileActive
+import com.genovich.visualide.actions.Show
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.module.Module
 import com.intellij.openapi.roots.ContentEntry
@@ -20,11 +21,12 @@ import kotlin.uuid.ExperimentalUuidApi
  * `ActionDefinition.generateAssembly()` produces the dependency-plane factory for `GuessLoop`:
  * a function taking every leaf port as a parameter and constructing the `GuessLoop` class
  * (design.md §3.2). `readGuess` is attached as a T-function (rung 2 step 2, design.md §1.6/§5.1)
- * via `ActionDefinition.tFunctionPorts` — a definition-level "known list," not a property of the
- * `readGuess` leaf itself — so it's defaulted to `Show(uiStateFlow.readGuessFlow)` rather than
- * required; `checkGuess` stays a plain required port. [testAssemblyTypeChecks] proves the three
- * generated files — the function class, its assembly, and its state projection — type-check
- * together, the same way [GuessLoopRoundTripTest] proves the function file alone type-checks (H2).
+ * via `ActionDefinition.portDefaults["readGuess"] = Show` — a definition-level map, not a property
+ * of the `readGuess` leaf itself — so it's defaulted to `Show(uiStateFlow.readGuessFlow)` rather
+ * than required; `checkGuess` has no entry and stays a plain required port.
+ * [testAssemblyTypeChecks] proves the three generated files — the function class, its assembly,
+ * and its state projection — type-check together, the same way [GuessLoopRoundTripTest] proves the
+ * function file alone type-checks (H2).
  */
 @OptIn(ExperimentalUuidApi::class)
 class GuessLoopAssemblyTest : BasePlatformTestCase() {
@@ -39,7 +41,7 @@ class GuessLoopAssemblyTest : BasePlatformTestCase() {
         body = RepeatWhileActive(
             Passing(listOf(Action("readGuess"), Action("checkGuess"))),
         ),
-        tFunctionPorts = setOf("readGuess"),
+        portDefaults = mapOf("readGuess" to Show),
     )
 
     fun testGeneratesTypedFactory() {
