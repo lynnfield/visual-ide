@@ -5,6 +5,8 @@ import com.genovich.visualide.actions.ActionDefinition
 import com.genovich.visualide.actions.Passing
 import com.genovich.visualide.actions.RepeatWhileActive
 import com.genovich.visualide.actions.Show
+import com.genovich.visualide.analysis.Expr
+import com.genovich.visualide.analysis.KotlinAnalysis
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.application.smartReadAction
 import com.intellij.openapi.module.Module
@@ -15,7 +17,6 @@ import com.intellij.testFramework.PsiTestUtil
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import kotlinx.coroutines.runBlocking
 import org.assertj.core.api.Assertions.assertThat
-import org.jetbrains.uast.UExpression
 import org.jetbrains.uast.UFile
 import org.jetbrains.uast.toUElementOfType
 import kotlin.uuid.ExperimentalUuidApi
@@ -71,14 +72,14 @@ class ShowTest : BasePlatformTestCase() {
             .isTrue()
     }
 
-    private fun parameterDefaultValue(source: String, fileName: String, parameterName: String): UExpression {
+    private fun parameterDefaultValue(source: String, fileName: String, parameterName: String): Expr {
         val psiFile = myFixture.addFileToProject(fileName, source)
         return runBlocking {
             smartReadAction(project) {
                 // Kotlin top-level functions surface via UAST as methods of a synthetic
                 // "<FileName>Kt" facade class, not directly off UFile (which only exposes real
                 // classes) — mirrors how ActionDefinition.parse reaches into a real class's method.
-                checkNotNull(
+                val defaultValue = checkNotNull(
                     psiFile.toUElementOfType<UFile>()
                         ?.classes
                         ?.firstOrNull()
@@ -88,6 +89,7 @@ class ShowTest : BasePlatformTestCase() {
                         ?.firstOrNull { it.name == parameterName }
                         ?.uastInitializer,
                 ) { "could not find default value for parameter `$parameterName`" }
+                KotlinAnalysis.toExpr(defaultValue)
             }
         }
     }

@@ -4,6 +4,7 @@ import com.genovich.visualide.actions.Action
 import com.genovich.visualide.actions.ActionDefinition
 import com.genovich.visualide.actions.Passing
 import com.genovich.visualide.actions.RepeatWhileActive
+import com.genovich.visualide.analysis.KotlinAnalysis
 import com.intellij.openapi.application.PathManager
 import com.intellij.openapi.application.smartReadAction
 import com.intellij.openapi.module.Module
@@ -109,7 +110,7 @@ class GuessLoopRoundTripTest : BasePlatformTestCase() {
                 psiFile.toUElementOfType<UFile>()
                     ?.classes
                     ?.firstOrNull()
-                    ?.let { ActionDefinition.parse(it) }
+                    ?.let { ActionDefinition.parse(KotlinAnalysis.parseClass(it)) }
             }
         }
     }

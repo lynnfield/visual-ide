@@ -2,11 +2,11 @@ package com.genovich.visualide.actions
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import com.genovich.visualide.analysis.Expr
 import com.intellij.openapi.progress.runBlockingCancellable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
-import org.jetbrains.uast.UExpression
 
 interface ActionLayout : Iterable<ActionLayout> {
 
@@ -27,12 +27,17 @@ interface ActionLayout : Iterable<ActionLayout> {
         ports: MutableMap<String, Pair<String, String>>,
     ): String
 
-    fun interface UExpressionParser<out T : ActionLayout?> {
-        fun parse(expression: UExpression): Result<T>
+    /**
+     * Matches this node's own generated shape against the engine's expression IR (design.md §4.5,
+     * D12) — never UAST/PSI directly. [com.genovich.visualide.analysis.KotlinAnalysis] is the sole
+     * adapter that builds an [Expr] tree; every node parser downstream of it is host-agnostic.
+     */
+    fun interface ExpressionParser<out T : ActionLayout?> {
+        fun parse(expression: Expr): Result<T>
     }
 
     companion object {
-        fun parse(expression: UExpression): Result<ActionLayout?> = runCatching {
+        fun parse(expression: Expr): Result<ActionLayout?> = runCatching {
             runBlockingCancellable {
                 val parsers = listOf(
                     Action,
@@ -61,6 +66,6 @@ interface ActionLayout : Iterable<ActionLayout> {
                     }
                 }
             }
-        }.recoverCatching { throw Exception("while parsing ${expression.asSourceString()}", it) }
+        }.recoverCatching { throw Exception("while parsing ${expression.sourceText}", it) }
     }
 }

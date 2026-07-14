@@ -8,19 +8,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
+import com.genovich.visualide.analysis.Call
+import com.genovich.visualide.analysis.Expr
+import com.genovich.visualide.analysis.Lambda
+import com.genovich.visualide.analysis.QualifiedCall
 import com.genovich.visualide.types.TYPE_NOTHING
 import com.genovich.visualide.ui.AddNewLayoutButton
 import com.genovich.visualide.ui.TextBlock
 import com.genovich.visualide.ui.step
-import org.jetbrains.kotlin.idea.base.psi.kotlinFqName
-import org.jetbrains.kotlin.name.FqName
-import org.jetbrains.uast.UBlockExpression
-import org.jetbrains.uast.UCallExpression
-import org.jetbrains.uast.UExpression
-import org.jetbrains.uast.ULambdaExpression
-import org.jetbrains.uast.UQualifiedReferenceExpression
-import org.jetbrains.uast.UReturnExpression
-import org.jetbrains.uast.tryResolveNamed
 
 data class RepeatWhileActive(
     val body: MutableState<ActionLayout?> = mutableStateOf(null)
@@ -63,27 +58,18 @@ data class RepeatWhileActive(
         return TYPE_NOTHING
     }
 
-    companion object : ActionLayout.UExpressionParser<RepeatWhileActive> {
+    companion object : ActionLayout.ExpressionParser<RepeatWhileActive> {
         const val REPEAT_WHILE_ACTIVE_FQN = """com.genovich.components.repeatWhileActive"""
 
-        override fun parse(expression: UExpression): Result<RepeatWhileActive> = runCatching {
-            checkNotNull(expression as? UQualifiedReferenceExpression) { "not a qualified reference expression" }
-                .also {
-                    checkNotNull(it.tryResolveNamed()) { "failed to resolve named element" }
-                        .let { checkNotNull(it.kotlinFqName) { "expression should have a kotlin fully qualified name" } }
-                        .also { check(FqName(REPEAT_WHILE_ACTIVE_FQN) == it) { "name should be $REPEAT_WHILE_ACTIVE_FQN" } }
-                }
-                .let { checkNotNull(it.selector as? UCallExpression) { "selector should be a call expression" } }
-                .valueArguments
+        override fun parse(expression: Expr): Result<RepeatWhileActive> = runCatching {
+            checkNotNull(expression as? QualifiedCall) { "not a qualified call expression" }
+                .also { check(it.resolvedQualifiedName == REPEAT_WHILE_ACTIVE_FQN) { "name should be $REPEAT_WHILE_ACTIVE_FQN" } }
+                .let { checkNotNull(it.selector as? Call) { "selector should be a call expression" } }
+                .arguments
                 .also { check(it.size == 1) { "selector should have only one argument" } }
                 .single()
-                .let { checkNotNull(it as? ULambdaExpression) { "the single argument should be a lambda" } }
-                .let { checkNotNull(it.body as? UBlockExpression) { "lambda body should be a block expression" } }
-                .expressions
-                .also { check(it.size == 1) { "lambda body should contain single expression" } }
-                .single()
-                .let { checkNotNull(it as? UReturnExpression) { "lambda body should be a single return expression" } }
-                .let { checkNotNull(it.returnExpression) { "return expression in lambda should exists" } }
+                .let { checkNotNull(it as? Lambda) { "the single argument should be a lambda" } }
+                .let { checkNotNull(it.singleReturnExpression) { "lambda body should be a single return expression" } }
                 .let { ActionLayout.parse(it) }
                 .getOrThrow()
                 .let { RepeatWhileActive(it) }

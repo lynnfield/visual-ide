@@ -9,18 +9,12 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.genovich.visualide.analysis.Call
+import com.genovich.visualide.analysis.Expr
+import com.genovich.visualide.analysis.Lambda
+import com.genovich.visualide.analysis.QualifiedCall
 import com.genovich.visualide.ui.AddNewLayoutButton
 import com.genovich.visualide.ui.RemoveButton
-import com.intellij.execution.processTools.mapFlat
-import org.jetbrains.kotlin.idea.base.psi.kotlinFqName
-import org.jetbrains.kotlin.name.FqName
-import org.jetbrains.uast.UBlockExpression
-import org.jetbrains.uast.UCallExpression
-import org.jetbrains.uast.UExpression
-import org.jetbrains.uast.ULambdaExpression
-import org.jetbrains.uast.UQualifiedReferenceExpression
-import org.jetbrains.uast.UReturnExpression
-import org.jetbrains.uast.tryResolveNamed
 
 data class Passing(
     val body: SnapshotStateList<ActionLayout> = mutableStateListOf()
@@ -63,39 +57,26 @@ data class Passing(
     ): String =
         body.fold(input) { previousType, layout -> layout.inferType(previousType, fresh, ports) }
 
-    companion object : ActionLayout.UExpressionParser<Passing> {
+    companion object : ActionLayout.ExpressionParser<Passing> {
         const val LET_FQN = "kotlin.StandardKt.let"
 
-        override fun parse(expression: UExpression): Result<Passing> = runCatching {
-            checkNotNull(expression as? UQualifiedReferenceExpression) { "not a qualified reference expression" }
-                .also {
-                    checkNotNull(it.tryResolveNamed()) { "failed to resolve named element" }
-                        .let { checkNotNull(it.kotlinFqName) { "expression should have a kotlin fully qualified name" } }
-                        .also { check(FqName(LET_FQN) == it) { "name should be $LET_FQN" } }
-                }
-                .let { generateSequence(it) { it.receiver as? UQualifiedReferenceExpression } }
-                .map { expression ->
+        override fun parse(expression: Expr): Result<Passing> = runCatching {
+            checkNotNull(expression as? QualifiedCall) { "not a qualified call expression" }
+                .also { check(it.resolvedQualifiedName == LET_FQN) { "name should be $LET_FQN" } }
+                .let { generateSequence(it) { it.receiver as? QualifiedCall } }
+                .map { chained ->
                     runCatching {
-                        expression
-                            .let { checkNotNull(it.selector as? UCallExpression) { "selector should be a call expression" } }
-                            .valueArguments
+                        chained
+                            .let { checkNotNull(it.selector as? Call) { "selector should be a call expression" } }
+                            .arguments
                             .also { check(it.size == 1) { "selector should have only one argument" } }
                             .single()
-                            .let { checkNotNull(it as? ULambdaExpression) { "the single argument should be a lambda" } }
-                            .let { checkNotNull(it.body as? UBlockExpression) { "lambda body should be a block expression" } }
-                            .expressions
-                            .also { check(it.size == 1) { "lambda body should contain single expression" } }
-                            .single()
-                            .let { checkNotNull(it as? UReturnExpression) { "lambda body should be a single return expression" } }
-                            .let { checkNotNull(it.returnExpression) { "return expression in lambda should exists" } }
+                            .let { checkNotNull(it as? Lambda) { "the single argument should be a lambda" } }
+                            .let { checkNotNull(it.singleReturnExpression) { "lambda body should be a single return expression" } }
+                            .let { checkNotNull(ActionLayout.parse(it).getOrThrow()) { "failed to convert to ActionLayout" } }
                     }
-                        .mapFlat { ActionLayout.parse(it) }
-                        .mapCatching { checkNotNull(it) { "failed to convert to ActionLayout" } }
                         .recoverCatching {
-                            throw Exception(
-                                "failed to parse ${expression.asSourceString()}",
-                                it
-                            )
+                            throw Exception("failed to parse ${chained.sourceText}", it)
                         }
                         .getOrThrow()
                 }

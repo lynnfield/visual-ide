@@ -10,20 +10,14 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.genovich.visualide.analysis.ClassInfo
 import com.genovich.visualide.types.TYPE_NOTHING
 import com.genovich.visualide.ui.AddNewLayoutButton
 import com.genovich.visualide.ui.TextBlock
 import com.genovich.visualide.ui.step
 import com.intellij.openapi.diagnostic.getOrLogException
-import com.intellij.util.asSafely
 import org.jetbrains.jewel.ui.component.Checkbox
 import org.jetbrains.jewel.ui.component.Text
-import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstanceOrNull
-import org.jetbrains.kotlin.utils.findIsInstanceAnd
-import org.jetbrains.uast.UBlockExpression
-import org.jetbrains.uast.UClass
-import org.jetbrains.uast.UMethod
-import org.jetbrains.uast.UReturnExpression
 import java.security.MessageDigest
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
@@ -299,38 +293,28 @@ data class ActionDefinition(
         const val UI_STATE_FLOW_SUFFIX = "UiStateFlow"
         const val UI_STATE_FLOW_PARAM_NAME = "uiStateFlow"
         const val FLOW_SUFFIX = "Flow"
-        private const val CHECKSUM_ATTRIBUTE_NAME = "checksum"
 
-        fun parse(uClass: UClass): ActionDefinition? =
-            uClass
-                .takeIf {
-                    it.uastSuperTypes.any { it.getQualifiedName() == COM_GENOVICH_COMPONENTS_ACTION }
-                }
+        /**
+         * Consumes [ClassInfo] — the engine IR (design.md §4.5, D12) — never UAST/PSI directly;
+         * [com.genovich.visualide.analysis.KotlinAnalysis] is the sole adapter that builds one from
+         * a UAST `UClass`. Callers (the tool window, tests) convert first.
+         */
+        fun parse(classInfo: ClassInfo): ActionDefinition? =
+            classInfo
+                .takeIf { COM_GENOVICH_COMPONENTS_ACTION in it.superTypeQualifiedNames }
                 ?.let {
                     val definition = ActionDefinition(
                         name = it.name ?: "Unknown",
-                        body = it.uastDeclarations
-                            .findIsInstanceAnd<UMethod> { it.name == INVOKE_METHOD_NAME }
-                            ?.uastBody
-                            ?.asSafely<UBlockExpression>()
-                            ?.expressions
-                            ?.firstIsInstanceOrNull<UReturnExpression>()
-                            ?.returnExpression
-                            ?.let { ActionLayout.parse(it) }
+                        body = it.invokeBody
+                            ?.let { expr -> ActionLayout.parse(expr) }
                             ?.getOrLogException { it.printStackTrace() },
                     )
-                    val storedChecksum = it.findAnnotation(COM_GENOVICH_COMPONENTS_DIAGRAM)
-                        ?.findAttributeValue(CHECKSUM_ATTRIBUTE_NAME)
-                        ?.evaluate() as? String
+                    val storedChecksum = it.diagramChecksum
                     if (storedChecksum == null) {
                         definition
                     } else {
                         definition.copy(
-                            isDrifted = storedChecksum != checksumOf(
-                                definition.bodyCode(
-                                    INPUT_PARAM_NAME
-                                )
-                            )
+                            isDrifted = storedChecksum != checksumOf(definition.bodyCode(INPUT_PARAM_NAME)),
                         )
                     }
                 }

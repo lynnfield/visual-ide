@@ -1,13 +1,13 @@
 package com.genovich.visualide.actions
 
-import org.jetbrains.uast.UCallExpression
-import org.jetbrains.uast.UExpression
+import com.genovich.visualide.analysis.Call
+import com.genovich.visualide.analysis.Expr
 
-object TodoStub : ActionLayout.UExpressionParser<ActionLayout?> {
+object TodoStub : ActionLayout.ExpressionParser<ActionLayout?> {
     fun generate(): String = """TODO("implement body")"""
 
-    override fun parse(expression: UExpression): Result<Nothing?> = runCatching {
-        checkNotNull(expression as? UCallExpression) { "is not a call expression" }
+    override fun parse(expression: Expr): Result<Nothing?> = runCatching {
+        checkNotNull(expression as? Call) { "is not a call expression" }
             .also { check(it.methodName == "TODO") { "should be named `TODO`" } }
         null
     }.recoverCatching {

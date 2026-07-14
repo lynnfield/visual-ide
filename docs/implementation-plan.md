@@ -166,10 +166,23 @@ atom, so the "`@Node` only, no `@Diagram`" case never arises here. `layout` is o
 
 **Acceptance.** Round-trip still green with annotations present; drift detection works. Validates H4.
 
-## Step 4 — Engine IR / KotlinAnalysis boundary (Rung 5 → §6 rung 4, H5)
+## Step 4 — Engine IR / KotlinAnalysis boundary (Rung 5 → §6 rung 4, H5) — done
 
 **Goal.** Interpose the engine's own IR between UAST and the nodes (design.md D12), so the model is
 not coupled to IntelliJ.
+
+**Note (as implemented).** New `com.genovich.visualide.analysis` package: a sealed `Expr` IR with
+exactly the four named shapes, plus `Lambda.singleReturnExpression` collapsing UAST's three-node
+lambda-body unwrap (block → single expression → must-be-return → `.returnExpression`) into one
+field, since every node parser needing a lambda body wanted exactly that. A `ClassInfo` data class
+(not one of the four named shapes, added because the acceptance criterion covers the whole `actions`
+package, including `ActionDefinition.parse`'s `UClass`-level entry point) rounds out the IR.
+`KotlinAnalysis` (`parseClass`/`toExpr`) is the sole adapter. Resolution
+(`resolvedName`/`resolvedQualifiedName`) is a field on every `Expr` variant, computed eagerly by the
+adapter, rather than scoped to one shape — different parsers need it off different shapes. Two
+platform utilities stayed in `actions` as out-of-scope (`runBlockingCancellable`'s cancellable
+coroutine race, `getOrLogException`'s exception logging) — neither carries UAST/PSI types across the
+boundary. See `docs/example-rung5.md`.
 
 **Tasks.**
 - Define a minimal engine IR for the expression shapes the parsers need (call, qualified call,

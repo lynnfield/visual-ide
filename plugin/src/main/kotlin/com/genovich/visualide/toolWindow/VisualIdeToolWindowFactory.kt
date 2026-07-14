@@ -9,6 +9,7 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import com.genovich.visualide.actions.ActionDefinition
+import com.genovich.visualide.analysis.KotlinAnalysis
 import com.genovich.visualide.ui.App
 import com.intellij.openapi.application.smartReadAction
 import com.intellij.openapi.command.WriteCommandAction
@@ -65,7 +66,7 @@ class VisualIdeToolWindowFactory : ToolWindowFactory, DumbAware {
                         ?.toUElementOfType<UFile>()
                         ?.classes
                         .orEmpty()
-                        .mapNotNull { ActionDefinition.parse(it) }
+                        .mapNotNull { ActionDefinition.parse(KotlinAnalysis.parseClass(it)) }
                 }
 
                 actions.clear()
