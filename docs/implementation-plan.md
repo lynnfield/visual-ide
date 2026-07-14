@@ -20,6 +20,11 @@ architecture and what "done" means for the earlier rungs.
   T-function ports. Validates the *projection* half of H3, plus H7. `com.genovich.components.Show`
   is the only recognized T-function binding and the only implementation of `PortDefault`
   (`actions/Show.kt`); customizable/multi-kind recognition is an open hypothesis (design.md §5.1).
+- **Rung 2 / Step 3 (done)** — `@Node`/`@Diagram(version, checksum)` emitted on every generated
+  class; the checksum is a SHA-256 of the normalized body text (design.md §2.7), recomputed on
+  `parse` and compared against the source's stored value to flag `ActionDefinition.isDrifted` when
+  the body was hand-edited out of band. `layout` stays an unimplemented stub. See
+  `docs/example-rung4.md`. Validates H4. Drift is detected but not yet surfaced in the UI.
 
 The engine lives in `plugin/src/main/kotlin/com/genovich/visualide/actions/`:
 `ActionLayout` (node interface: `Render` / `generate` / `inferType` / `parse`), the nodes
@@ -134,9 +139,20 @@ sealed wrapper has one case per T-function.
 `Render`; a dedicated T glyph on the canvas is out of scope for the engine tests), generate `Show`
 defaults, and produce a compiling `UiStateFlow`. Validates H3 projection + H7.
 
-## Step 3 — Annotations + checksum (Rung 4 → §6 rung 3, H4)
+## Step 3 — Annotations + checksum (Rung 4 → §6 rung 3, H4) — done
 
 **Goal.** Emit `@Node`/`@Diagram(checksum, layout)` and detect drift.
+
+**Note (as implemented).** The checksum is taken over the **body text only** (the `invoke()`
+implementation string), not the whole class — hashing the whole class would make the checksum
+depend on the annotation line embedding it, a chicken-and-egg problem. `@Node` carries no
+arguments: its `label`/`category` fields exist on the annotation (mirroring design.md §2.4's
+snippet) but nothing in `ActionDefinition`'s state tracks them yet (D9 says they're cosmetics
+only). `@Diagram` is emitted unconditionally, since every generated `ActionDefinition` is a
+composite (IDE-authored) body by construction — there is no code path that generates a leaf/custom
+atom, so the "`@Node` only, no `@Diagram`" case never arises here. `layout` is omitted entirely
+(unimplemented stub, per the plan). Drift is detected (`ActionDefinition.isDrifted`, set by
+`parse`) but not yet surfaced anywhere in the UI. See `docs/example-rung4.md`.
 
 **Tasks.**
 - Define `@Node` and `@Diagram` annotations (design.md §2.4). Emit them on generated classes.

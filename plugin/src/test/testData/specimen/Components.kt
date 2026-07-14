@@ -15,6 +15,14 @@ abstract class Action<in Input, out Output> {
     abstract suspend operator fun invoke(input: Input): Output
 }
 
+/** Face + interface, every node (design.md §2.4, D8); descriptor is inferred from the Kotlin
+ * signature (D9) — these fields are cosmetics only, not modeled by the engine yet. */
+annotation class Node(val label: String = "", val category: String = "")
+
+/** Composite bodies only (design.md §2.4): identity ([checksum], a hash of the normalized body,
+ * for drift detection) and optional cosmetic [layout]. */
+annotation class Diagram(val version: Int = 1, val checksum: String = "", val layout: String = "")
+
 suspend inline fun repeatWhileActive(block: () -> Unit): Nothing {
     while (true) {
         block()

@@ -1,11 +1,11 @@
 {
     "schema_version": 1,
-    "commit": "c36c6b21c7566726c46f528c3b7ff00329bede5f",
-    "indexed_at": "2026-07-11T11:10:16Z",
-    "project": "Users-genovich-AndroidStudioProjects-VisualIDE-.claude-worktrees-fancy-watching-gem",
-    "nodes": 597,
-    "edges": 1138,
-    "original_size": 2228224,
-    "compressed_size": 188980,
-    "compression_level": 9
+    "commit": "617fcaefb1a3211fb8e8280c5448b08141058a84",
+    "indexed_at": "2026-07-12T15:02:43Z",
+    "project": "Users-genovich-AndroidStudioProjects-VisualIDE",
+    "nodes": 660,
+    "edges": 1318,
+    "original_size": 3276800,
+    "compressed_size": 301487,
+    "compression_level": 3
 }

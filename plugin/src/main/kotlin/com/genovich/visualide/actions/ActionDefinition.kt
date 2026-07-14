@@ -24,6 +24,7 @@ import org.jetbrains.uast.UBlockExpression
 import org.jetbrains.uast.UClass
 import org.jetbrains.uast.UMethod
 import org.jetbrains.uast.UReturnExpression
+import java.security.MessageDigest
 import kotlin.uuid.ExperimentalUuidApi
 import kotlin.uuid.Uuid
 
@@ -42,17 +43,26 @@ data class ActionDefinition(
      */
     val portDefaults: MutableState<Map<String, PortDefault>> = mutableStateOf(emptyMap()),
     val id: Uuid = Uuid.random(),
+    /**
+     * Set by [parse] when the source's `@Diagram(checksum = …)` doesn't match the checksum of the
+     * parsed-and-regenerated body (design.md §2.4, §4.4) — the body was hand-edited out of band
+     * instead of through the diagram tool. `false` for definitions built in memory (nothing to
+     * drift from) and always `false` when the source carries no `@Diagram` (a leaf/custom node).
+     */
+    val isDrifted: Boolean = false,
 ) {
     constructor(
         name: String,
         body: ActionLayout? = null,
         portDefaults: Map<String, PortDefault> = emptyMap(),
         id: Uuid = Uuid.random(),
+        isDrifted: Boolean = false,
     ) : this(
         name = mutableStateOf(name),
         body = mutableStateOf(body),
         portDefaults = mutableStateOf(portDefaults),
         id = id,
+        isDrifted = isDrifted,
     )
 
     @Composable
@@ -107,19 +117,29 @@ data class ActionDefinition(
             if (signature.ports.isEmpty()) {
                 ""
             } else {
-                signature.ports.entries.joinToString(separator = ",\n", prefix = "\n") { (portName, io) ->
+                signature.ports.entries.joinToString(
+                    separator = ",\n",
+                    prefix = "\n"
+                ) { (portName, io) ->
                     "val `$portName`: $COM_GENOVICH_COMPONENTS_ACTION<${io.first}, ${io.second}>"
                 }
             }
 
-        val input = "input"
+        val inputParamName = INPUT_PARAM_NAME
+        val bodyCode = bodyCode(inputParamName)
         return """
+            @$COM_GENOVICH_COMPONENTS_NODE
+            @$COM_GENOVICH_COMPONENTS_DIAGRAM(version = 1, checksum = "${checksumOf(bodyCode)}")
             class `${name.value}`<$typeParameters>($portDeclarations) : $COM_GENOVICH_COMPONENTS_ACTION<$INPUT_TYPE, ${signature.outputType}>() {
-                override suspend operator fun $INVOKE_METHOD_NAME($input: $INPUT_TYPE): ${signature.outputType} =
-                    ${(body.value?.generate(input) ?: TodoStub.generate())}
+                override suspend operator fun $INVOKE_METHOD_NAME($inputParamName: $INPUT_TYPE): ${signature.outputType} =
+                    $bodyCode
             }
         """.trimIndent()
     }
+
+    /** The normalized body text (design.md §2.7) the [checksumOf] hash is taken over. */
+    private fun bodyCode(inputParamName: String): String =
+        body.value?.generate(inputParamName) ?: TodoStub.generate()
 
     /**
      * The dependency-plane factory (design.md §3.2): a function taking every leaf port as a
@@ -138,7 +158,8 @@ data class ActionDefinition(
 
         val parameterLines = buildList {
             if (tFunctionPortNames.isNotEmpty()) {
-                val uiStateFlowTypeParameters = uiStateFlowTypeParameters(signature, tFunctionPortNames)
+                val uiStateFlowTypeParameters =
+                    uiStateFlowTypeParameters(signature, tFunctionPortNames)
                 add("    `$UI_STATE_FLOW_PARAM_NAME`: `$uiStateFlowName`<$uiStateFlowTypeParameters> = `$uiStateFlowName`()")
             }
             signature.ports.forEach { (portName, io) ->
@@ -151,13 +172,25 @@ data class ActionDefinition(
             }
         }
         val parameterDeclarations =
-            if (parameterLines.isEmpty()) "" else parameterLines.joinToString(separator = ",\n", prefix = "\n", postfix = ",\n")
+            if (parameterLines.isEmpty()) {
+                ""
+            } else {
+                parameterLines.joinToString(
+                    separator = ",\n",
+                    prefix = "\n",
+                    postfix = ",\n",
+                )
+            }
 
         val constructorArguments =
             if (signature.ports.isEmpty()) {
                 ""
             } else {
-                signature.ports.keys.joinToString(separator = ",\n", prefix = "\n", postfix = ",\n") { portName ->
+                signature.ports.keys.joinToString(
+                    separator = ",\n",
+                    prefix = "\n",
+                    postfix = ",\n",
+                ) { portName ->
                     "    `$portName` = `$portName`"
                 }
             }
@@ -198,9 +231,11 @@ data class ActionDefinition(
             "        data class `${screenCaseName(portName)}`<$typeParameters>(val state: $COM_GENOVICH_COMPONENTS_UI_STATE<$inputType, $outputType>) : Screen<$typeParameters>"
         }
 
-        val combineArguments = tFunctionPortNames.joinToString(separator = ",\n            ") { portName ->
-            "$COM_GENOVICH_COMPONENTS_EMIT_SELF_WHEN_HAVE_VALUE(`$portName$FLOW_SUFFIX`) { Screen.`${screenCaseName(portName)}`(it) }"
-        }
+        val combineArguments =
+            tFunctionPortNames.joinToString(separator = ",\n            ") { portName ->
+                val screenCaseName = screenCaseName(portName)
+                "$COM_GENOVICH_COMPONENTS_EMIT_SELF_WHEN_HAVE_VALUE(`$portName$FLOW_SUFFIX`) { Screen.`$screenCaseName`(it) }"
+            }
 
         return """
             class `${name.value}$UI_STATE_FLOW_SUFFIX`<$typeParameters> {
@@ -219,12 +254,17 @@ data class ActionDefinition(
     }
 
     /** Type parameters (in [Signature.typeParameters] order) referenced by [tFunctionPortNames]. */
-    private fun uiStateFlowTypeParameters(signature: Signature, tFunctionPortNames: Collection<String>): String {
-        val used = tFunctionPortNames.flatMapTo(mutableSetOf()) { signature.ports.getValue(it).toList() }
+    private fun uiStateFlowTypeParameters(
+        signature: Signature,
+        tFunctionPortNames: Collection<String>,
+    ): String {
+        val used =
+            tFunctionPortNames.flatMapTo(mutableSetOf()) { signature.ports.getValue(it).toList() }
         return signature.typeParameters.filter { it in used }.joinToString(separator = ", ")
     }
 
-    private fun screenCaseName(portName: String): String = portName.replaceFirstChar(Char::uppercaseChar)
+    private fun screenCaseName(portName: String): String =
+        portName.replaceFirstChar(Char::uppercaseChar)
 
     /** [typeParameters] in declaration order (`Input, T1..Tn`); [ports] preserve first-use order. */
     data class Signature(
@@ -244,16 +284,22 @@ data class ActionDefinition(
     companion object {
         const val INVOKE_METHOD_NAME = "invoke"
         const val COM_GENOVICH_COMPONENTS_ACTION = "com.genovich.components.Action"
-        const val COM_GENOVICH_COMPONENTS_MUTABLE_STATE_FLOW = "com.genovich.components.MutableStateFlow"
+        const val COM_GENOVICH_COMPONENTS_MUTABLE_STATE_FLOW =
+            "com.genovich.components.MutableStateFlow"
         const val COM_GENOVICH_COMPONENTS_STATE_FLOW = "com.genovich.components.StateFlow"
         const val COM_GENOVICH_COMPONENTS_UI_STATE = "com.genovich.components.UiState"
         const val COM_GENOVICH_COMPONENTS_COMBINE = "com.genovich.components.combine"
-        const val COM_GENOVICH_COMPONENTS_EMIT_SELF_WHEN_HAVE_VALUE = "com.genovich.components.emitSelfWhenHaveValue"
+        const val COM_GENOVICH_COMPONENTS_EMIT_SELF_WHEN_HAVE_VALUE =
+            "com.genovich.components.emitSelfWhenHaveValue"
+        const val COM_GENOVICH_COMPONENTS_NODE = "com.genovich.components.Node"
+        const val COM_GENOVICH_COMPONENTS_DIAGRAM = "com.genovich.components.Diagram"
         const val INPUT_TYPE = "Input"
+        const val INPUT_PARAM_NAME = "input"
         const val ASSEMBLY_SUFFIX = "Assembly"
         const val UI_STATE_FLOW_SUFFIX = "UiStateFlow"
         const val UI_STATE_FLOW_PARAM_NAME = "uiStateFlow"
         const val FLOW_SUFFIX = "Flow"
+        private const val CHECKSUM_ATTRIBUTE_NAME = "checksum"
 
         fun parse(uClass: UClass): ActionDefinition? =
             uClass
@@ -261,7 +307,7 @@ data class ActionDefinition(
                     it.uastSuperTypes.any { it.getQualifiedName() == COM_GENOVICH_COMPONENTS_ACTION }
                 }
                 ?.let {
-                    ActionDefinition(
+                    val definition = ActionDefinition(
                         name = it.name ?: "Unknown",
                         body = it.uastDeclarations
                             .findIsInstanceAnd<UMethod> { it.name == INVOKE_METHOD_NAME }
@@ -273,6 +319,27 @@ data class ActionDefinition(
                             ?.let { ActionLayout.parse(it) }
                             ?.getOrLogException { it.printStackTrace() },
                     )
+                    val storedChecksum = it.findAnnotation(COM_GENOVICH_COMPONENTS_DIAGRAM)
+                        ?.findAttributeValue(CHECKSUM_ATTRIBUTE_NAME)
+                        ?.evaluate() as? String
+                    if (storedChecksum == null) {
+                        definition
+                    } else {
+                        definition.copy(
+                            isDrifted = storedChecksum != checksumOf(
+                                definition.bodyCode(
+                                    INPUT_PARAM_NAME
+                                )
+                            )
+                        )
+                    }
                 }
+
+        /** SHA-256 of [bodyCode], the checksum stored in `@Diagram` and checked for drift on [parse]. */
+        private fun checksumOf(bodyCode: String): String {
+            val digest =
+                MessageDigest.getInstance("SHA-256").digest(bodyCode.toByteArray(Charsets.UTF_8))
+            return "sha256:" + digest.joinToString(separator = "") { "%02x".format(it) }
+        }
     }
 }
