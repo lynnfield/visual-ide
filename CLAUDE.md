@@ -61,6 +61,12 @@ This is a Kotlin Multiplatform Gradle project, but only one module currently has
   used to bootstrap the repo before the decision to pivot to an IntelliJ plugin (see README.md).
   Not part of the active product; don't extend these unless specifically asked to.
 
+## Git workflow
+
+`.codebase-memory/` (the `codebase-memory-mcp` index artifact) is tracked in git. Whenever you
+make a commit, stage and include any pending changes under `.codebase-memory/` alongside the code
+changes, so the checked-in index stays in sync with the commit it describes.
+
 ## Commands
 
 All commands run from the repo root using the Gradle wrapper.
