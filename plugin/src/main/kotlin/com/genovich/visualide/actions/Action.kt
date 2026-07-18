@@ -29,6 +29,7 @@ data class Action(
         input: String,
         fresh: () -> String,
         ports: MutableMap<String, Pair<String, String>>,
+        scope: MutableMap<String, String>,
     ): String = ports.getOrPut(name.value) { input to fresh() }.second
 
     companion object : ActionLayout.ExpressionParser<Action> {

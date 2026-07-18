@@ -4,14 +4,20 @@ import com.intellij.util.asSafely
 import org.jetbrains.kotlin.idea.base.psi.kotlinFqName
 import org.jetbrains.kotlin.utils.addToStdlib.firstIsInstanceOrNull
 import org.jetbrains.kotlin.utils.findIsInstanceAnd
+import org.jetbrains.uast.UBinaryExpressionWithType
 import org.jetbrains.uast.UBlockExpression
 import org.jetbrains.uast.UCallExpression
 import org.jetbrains.uast.UClass
+import org.jetbrains.uast.UDeclarationsExpression
 import org.jetbrains.uast.UExpression
 import org.jetbrains.uast.ULambdaExpression
+import org.jetbrains.uast.ULocalVariable
 import org.jetbrains.uast.UMethod
 import org.jetbrains.uast.UQualifiedReferenceExpression
 import org.jetbrains.uast.UReturnExpression
+import org.jetbrains.uast.USwitchClauseExpressionWithBody
+import org.jetbrains.uast.USwitchExpression
+import org.jetbrains.uast.UYieldExpression
 import org.jetbrains.uast.tryResolveNamed
 
 /**
@@ -67,14 +73,35 @@ object KotlinAnalysis {
 
             is ULambdaExpression -> Lambda(
                 sourceText = sourceText,
-                singleReturnExpression = expression.body
+                statements = expression.body
                     .asSafely<UBlockExpression>()
                     ?.expressions
-                    ?.singleOrNull()
-                    ?.asSafely<UReturnExpression>()
-                    ?.returnExpression
-                    ?.let { toExpr(it) },
+                    ?.map { toStmt(it) }
+                    ?: emptyList(),
             )
+
+            is USwitchExpression -> {
+                val subject = localVariableOf(expression.expression)
+                WhenExpr(
+                    sourceText = sourceText,
+                    subjectName = subject?.name,
+                    subjectInitializer = subject?.uastInitializer?.let { toExpr(it) },
+                    cases = expression.body.expressions
+                        .filterIsInstance<USwitchClauseExpressionWithBody>()
+                        .map { entry ->
+                            val caseType = entry.caseValues
+                                .singleOrNull()
+                                .asSafely<UBinaryExpressionWithType>()
+                                ?.typeReference
+                                ?.getQualifiedName()
+                            WhenCase(
+                                sourceText = entry.asSourceString(),
+                                caseTypeQualifiedName = caseType,
+                                statements = entry.body.expressions.map { toStmt(it) },
+                            )
+                        },
+                )
+            }
 
             else -> Reference(
                 sourceText = sourceText,
@@ -83,4 +110,40 @@ object KotlinAnalysis {
             )
         }
     }
+
+    /**
+     * Converts one statement of a block body (design.md §2.7's SSA-like normal form: named `val`
+     * bindings, then a trailing expression). Total/best-effort like [toExpr] — an unrecognized
+     * shape falls back to an [ExprStmt] wrapping the whole statement rather than throwing, so a
+     * malformed or hand-written block never aborts the wider conversion.
+     *
+     * A block's trailing expression is wrapped by UAST — as an implicit [UReturnExpression] for a
+     * lambda body, or as a [UYieldExpression] for a `when`-arm body (its equivalent of "this arm's
+     * result") — either way unwrapped down to the expression underneath.
+     */
+    private fun toStmt(expression: UExpression): Stmt {
+        val sourceText = expression.asSourceString()
+        val local = localVariableOf(expression)
+        val initializer = local?.uastInitializer
+
+        return when {
+            local != null && initializer != null ->
+                ValStmt(sourceText, local.name, toExpr(initializer))
+
+            expression is UReturnExpression ->
+                ExprStmt(sourceText, toExpr(expression.returnExpression ?: expression))
+
+            expression is UYieldExpression ->
+                ExprStmt(sourceText, toExpr(expression.expression ?: expression))
+
+            else -> ExprStmt(sourceText, toExpr(expression))
+        }
+    }
+
+    /** `val name = …` as a single-variable [UDeclarationsExpression], if [expression] is one. */
+    private fun localVariableOf(expression: UExpression?): ULocalVariable? =
+        expression.asSafely<UDeclarationsExpression>()
+            ?.declarations
+            ?.singleOrNull()
+            ?.asSafely<ULocalVariable>()
 }

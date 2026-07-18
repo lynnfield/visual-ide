@@ -32,9 +32,11 @@ import kotlin.uuid.ExperimentalUuidApi
  *     ) : com.genovich.components.Action<Input, Output>() {
  *         override suspend operator fun invoke(input: Input): Output =
  *             com.genovich.components.repeatWhileActive {
- *                 input
- *                 .let { `readGuess`(it) }
- *                 .let { `checkGuess`(it) }
+ *                 run {
+ *                     val step1 = `readGuess`(input)
+ *                     val step2 = `checkGuess`(step1)
+ *                     step2
+ *                 }
  *             }
  *     }
  *

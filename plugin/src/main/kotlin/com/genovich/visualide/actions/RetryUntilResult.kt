@@ -12,6 +12,7 @@ import com.genovich.visualide.analysis.Call
 import com.genovich.visualide.analysis.Expr
 import com.genovich.visualide.analysis.Lambda
 import com.genovich.visualide.analysis.QualifiedCall
+import com.genovich.visualide.analysis.singleReturnExpression
 import com.genovich.visualide.types.TYPE_NOTHING
 import com.genovich.visualide.ui.AddNewLayoutButton
 import com.genovich.visualide.ui.TextBlock
@@ -52,7 +53,8 @@ data class RetryUntilResult(
         input: String,
         fresh: () -> String,
         ports: MutableMap<String, Pair<String, String>>,
-    ): String = body.value?.inferType(input, fresh, ports) ?: TYPE_NOTHING
+        scope: MutableMap<String, String>,
+    ): String = body.value?.inferType(input, fresh, ports, scope) ?: TYPE_NOTHING
 
     companion object : ActionLayout.ExpressionParser<RetryUntilResult> {
         const val RETRY_UNTIL_RESULT_FQN = "com.genovich.components.retryUntilResult"

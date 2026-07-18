@@ -73,14 +73,16 @@ class GuessLoopChecksumTest : BasePlatformTestCase() {
         myFixture.copyFileToProject("specimen/Components.kt", "com/genovich/components/Components.kt")
 
         val code1 = fileFor(guessLoopDefinition().generate())
-        // Simulate an out-of-band hand-edit: swap the pipeline order in the body text while
-        // leaving the @Diagram checksum (still the original) untouched. Swap via a marker string
-        // that won't otherwise occur in the generated code, so unrelated text is untouched.
+        // Simulate an out-of-band hand-edit: swap the pipeline order in the body text (and, since
+        // a plain text swap of every occurrence keeps the port declarations self-consistent, the
+        // whole file) while leaving the @Diagram checksum (still the original) untouched. Swap via
+        // a marker string that won't otherwise occur in the generated code, so unrelated text is
+        // untouched.
         val marker = "@@SWAP@@"
         val tampered = code1
-            .replace("`readGuess`(it)", marker)
-            .replace("`checkGuess`(it)", "`readGuess`(it)")
-            .replace(marker, "`checkGuess`(it)")
+            .replace("`readGuess`", marker)
+            .replace("`checkGuess`", "`readGuess`")
+            .replace(marker, "`checkGuess`")
 
         val reparsed = checkNotNull(parseDefinition(tampered, "GuessLoopTampered.kt"))
 
