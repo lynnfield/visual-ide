@@ -195,10 +195,34 @@ imports `org.jetbrains.uast`.
 
 **Acceptance.** Same behavior, no UAST types in the node logic. Validates H5.
 
-## Step 5 — Value plumbing, Branch, and the full game (§6 rung 5, H6 + finish H7)
+## Step 5 — Value plumbing, Branch, and the full game (§6 rung 5, H6 + finish H7) — done
 
 **Goal.** Express a real body with value manipulation and n-way branching; complete the
 guess-the-number specimen.
+
+**Note (as implemented).** `Passing` was reworked to named SSA `val`s wrapped in `run { }` (the
+predicted H6 break, confirmed). Of design.md §2.5's value-plumbing palette, only `Tuple`
+(`a.to(b)` — dot-call form, not the infix `a to b` operator; see `docs/example-rung6.md`) and a
+new third primitive, `Ref` (naming a value already in scope — needed *underneath* `Tuple` to
+recover `secret` after `askGuess` consumes it), were implemented; `Construct`/`Copy`/`Project`/
+`Select`/`Guard`/`Not` are not — the concrete "Target (rung 5)" example in design.md §6.2 only
+requires `Tuple` and `Branch`, and each of the other six is an independent, bounded follow-up
+(same shape as every existing node). `Ref.inferType` required threading a new fourth parameter,
+`scope: MutableMap<String, String>`, through `ActionLayout.inferType` everywhere `ports` already
+goes — a real per-body name→type map (seeded with the composite's own `input`, grown by each
+`Passing` step), not a guess. `Branch` generates an exhaustive `when` with a **required trailing
+`else -> TODO(...)`** arm: this engine's structural type inference only ever mints opaque type
+variables, so Kotlin can't prove exhaustiveness from `is Case ->` checks against a bare type
+parameter — the diagram's own completeness invariant (every case wired) substitutes for
+compiler-enforced exhaustiveness. The full `GuessGame` specimen round-trips and type-checks (H1,
+H2, H3/H7 with two T-functions), but **loop exit on `Correct` is not implemented** —
+`repeatWhileActive` has no break/return in the current node catalog; design.md §1.4's
+`updateLoop(initial){ step }` is a different, unimplemented Loop primitive. The IR gained two new
+shapes to support this: `Lambda.statements: List<Stmt>` (replacing `singleReturnExpression`, for
+named-`val` blocks) and `WhenExpr`/`WhenCase` (for `Branch`'s `when`). **Optional Parallel rung not
+attempted.** See `docs/example-rung6.md` for full detail, including two FQN/UAST-shape bugs only
+caught by actually running the round-trip (a guessed `to` FQN, and a `UYieldExpression` wrapper on
+`when`-arm results that the Step 4 probe didn't surface).
 
 **Tasks.**
 - **Named SSA `val`s.** Replace `Passing`'s linear `.let{}` pipe with named `val` bindings

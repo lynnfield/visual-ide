@@ -19,12 +19,17 @@ interface ActionLayout : Iterable<ActionLayout> {
      * Structural type inference (design doc rung 1 / H2). Given the [input] type expression,
      * returns this node's output type expression, recording each leaf port's `<in, out>` types
      * into [ports] (keyed by port name; first occurrence wins). [fresh] mints unique
-     * type-variable names.
+     * type-variable names. [scope] is the rung-5 addition backing [Ref] (design.md §2.5): every
+     * named value reachable at this point in the body — the composite's own `input` (seeded by
+     * [ActionDefinition.signature]) plus each `Passing` step's `stepN` — mapped to its inferred
+     * type, so `Ref("someName")` can recover a real type instead of guessing. Nodes that don't
+     * introduce or consume named values (most of them) just thread it through unchanged.
      */
     fun inferType(
         input: String,
         fresh: () -> String,
         ports: MutableMap<String, Pair<String, String>>,
+        scope: MutableMap<String, String>,
     ): String
 
     /**
@@ -45,6 +50,9 @@ interface ActionLayout : Iterable<ActionLayout> {
                     RepeatWhileActive,
                     Passing,
                     TodoStub,
+                    Ref,
+                    Tuple,
+                    Branch,
                 )
                     .map { async(Dispatchers.Default) { it.parse(expression) } }
 

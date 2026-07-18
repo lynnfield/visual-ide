@@ -42,7 +42,7 @@ class GuessLoopGenerateTest {
             .describedAs("the loop's output type is Nothing")
             .contains(": com.genovich.components.Action<Input, Nothing>")
         assertThat(code).describedAs("emits the loop").contains(RepeatWhileActive.REPEAT_WHILE_ACTIVE_FQN)
-        assertThat(code).describedAs("pipes readGuess").contains(".let { `readGuess`(it) }")
-        assertThat(code).describedAs("pipes checkGuess").contains(".let { `checkGuess`(it) }")
+        assertThat(code).describedAs("binds a named step for readGuess").contains("val step1 = `readGuess`(input)")
+        assertThat(code).describedAs("binds a named step for checkGuess").contains("val step2 = `checkGuess`(step1)")
     }
 }

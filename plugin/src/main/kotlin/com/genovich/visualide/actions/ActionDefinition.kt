@@ -98,7 +98,10 @@ data class ActionDefinition(
         val ports = mutableMapOf<String, Pair<String, String>>()
         val typeParameters = mutableListOf(INPUT_TYPE)
         val fresh = { "T${typeParameters.size}".also(typeParameters::add) }
-        val outputType = body.value?.inferType(INPUT_TYPE, fresh, ports) ?: TYPE_NOTHING
+        // Seeded with the composite's own input so a top-level Ref(INPUT_PARAM_NAME) resolves to
+        // a real type (design.md §2.5) — see ActionLayout.inferType's `scope` parameter.
+        val scope = mutableMapOf(INPUT_PARAM_NAME to INPUT_TYPE)
+        val outputType = body.value?.inferType(INPUT_TYPE, fresh, ports, scope) ?: TYPE_NOTHING
         return Signature(typeParameters, ports, outputType)
     }
 
