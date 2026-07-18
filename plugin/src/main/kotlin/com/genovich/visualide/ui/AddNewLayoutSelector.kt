@@ -12,9 +12,12 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
 import com.genovich.visualide.actions.Action
 import com.genovich.visualide.actions.ActionLayout
+import com.genovich.visualide.actions.Branch
 import com.genovich.visualide.actions.Passing
+import com.genovich.visualide.actions.Ref
 import com.genovich.visualide.actions.RepeatWhileActive
 import com.genovich.visualide.actions.RetryUntilResult
+import com.genovich.visualide.actions.Tuple
 import org.jetbrains.jewel.foundation.ExperimentalJewelApi
 import org.jetbrains.jewel.ui.component.IconActionButton
 import org.jetbrains.jewel.ui.icons.AllIconsKeys
@@ -35,6 +38,9 @@ fun AddNewLayoutButton(
                 ContextMenuItem("Retry until result") { onAdd(RetryUntilResult()) },
                 ContextMenuItem("Passing") { onAdd(Passing()) },
                 ContextMenuItem("Action") { onAdd(Action()) },
+                ContextMenuItem("Ref") { onAdd(Ref()) },
+                ContextMenuItem("Tuple") { onAdd(Tuple()) },
+                ContextMenuItem("Branch") { onAdd(Branch()) },
             )
         },
     ) {

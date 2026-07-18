@@ -12,6 +12,7 @@ import com.genovich.visualide.analysis.Call
 import com.genovich.visualide.analysis.Expr
 import com.genovich.visualide.analysis.Lambda
 import com.genovich.visualide.analysis.QualifiedCall
+import com.genovich.visualide.analysis.singleReturnExpression
 import com.genovich.visualide.types.TYPE_NOTHING
 import com.genovich.visualide.ui.AddNewLayoutButton
 import com.genovich.visualide.ui.TextBlock
@@ -52,9 +53,10 @@ data class RepeatWhileActive(
         input: String,
         fresh: () -> String,
         ports: MutableMap<String, Pair<String, String>>,
+        scope: MutableMap<String, String>,
     ): String {
         // The loop threads its input into the body each iteration and never returns normally.
-        body.value?.inferType(input, fresh, ports)
+        body.value?.inferType(input, fresh, ports, scope)
         return TYPE_NOTHING
     }
 

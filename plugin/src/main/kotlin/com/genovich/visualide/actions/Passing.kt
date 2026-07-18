@@ -11,8 +11,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import com.genovich.visualide.analysis.Call
 import com.genovich.visualide.analysis.Expr
+import com.genovich.visualide.analysis.ExprStmt
 import com.genovich.visualide.analysis.Lambda
-import com.genovich.visualide.analysis.QualifiedCall
+import com.genovich.visualide.analysis.Reference
+import com.genovich.visualide.analysis.Stmt
+import com.genovich.visualide.analysis.ValStmt
 import com.genovich.visualide.ui.AddNewLayoutButton
 import com.genovich.visualide.ui.RemoveButton
 
@@ -43,48 +46,83 @@ data class Passing(
         }
     }
 
+    /**
+     * Named SSA `val`s (design.md §2.7), not a `.let{}` chain — each step is bound to its own
+     * `stepN` before the next runs, so intermediates can be reused (the H6 target this rung
+     * validates). Wrapped in `run { }` so the whole pipeline stays the single expression
+     * [ActionLayout.generate]'s contract expects. `stepN` is positional, not a user-authored node
+     * id — per-node naming is a future UI feature (design.md §2.7 wants "node id = val name"),
+     * out of scope here.
+     */
     override fun generate(input: String): String = body
         .takeIf { it.isNotEmpty() }
-        ?.joinToString(separator = "\n", prefix = "$input\n", postfix = "\n") { layout ->
-            """.let { ${layout.generate("it")} }"""
+        ?.let { steps ->
+            val stepNames = steps.indices.map { "step${it + 1}" }
+            val valDeclarations = steps.mapIndexed { index, layout ->
+                val previousValue = if (index == 0) input else stepNames[index - 1]
+                "    val ${stepNames[index]} = ${layout.generate(previousValue)}"
+            }
+            (valDeclarations + "    ${stepNames.last()}")
+                .joinToString(separator = "\n", prefix = "run {\n", postfix = "\n}")
         }
         ?: TodoStub.generate()
 
+    /**
+     * Also records each step's type into [scope] under its `stepN` [generate] name — otherwise a
+     * later [Ref] naming an earlier step (not just the immediately-preceding one, already carried
+     * by the fold's own accumulator) could never recover a real type. See [ActionLayout.inferType].
+     */
     override fun inferType(
         input: String,
         fresh: () -> String,
         ports: MutableMap<String, Pair<String, String>>,
-    ): String =
-        body.fold(input) { previousType, layout -> layout.inferType(previousType, fresh, ports) }
+        scope: MutableMap<String, String>,
+    ): String = body.foldIndexed(input) { index, previousType, layout ->
+        layout.inferType(previousType, fresh, ports, scope)
+            .also { stepType -> scope["step${index + 1}"] = stepType }
+    }
 
     companion object : ActionLayout.ExpressionParser<Passing> {
-        const val LET_FQN = "kotlin.StandardKt.let"
+        const val RUN_FQN = "kotlin.StandardKt.run"
 
         override fun parse(expression: Expr): Result<Passing> = runCatching {
-            checkNotNull(expression as? QualifiedCall) { "not a qualified call expression" }
-                .also { check(it.resolvedQualifiedName == LET_FQN) { "name should be $LET_FQN" } }
-                .let { generateSequence(it) { it.receiver as? QualifiedCall } }
-                .map { chained ->
-                    runCatching {
-                        chained
-                            .let { checkNotNull(it.selector as? Call) { "selector should be a call expression" } }
-                            .arguments
-                            .also { check(it.size == 1) { "selector should have only one argument" } }
-                            .single()
-                            .let { checkNotNull(it as? Lambda) { "the single argument should be a lambda" } }
-                            .let { checkNotNull(it.singleReturnExpression) { "lambda body should be a single return expression" } }
-                            .let { checkNotNull(ActionLayout.parse(it).getOrThrow()) { "failed to convert to ActionLayout" } }
-                    }
-                        .recoverCatching {
-                            throw Exception("failed to parse ${chained.sourceText}", it)
-                        }
-                        .getOrThrow()
-                }
-                .toList()
-                .reversed()
+            checkNotNull(expression as? Call) { "not a call expression" }
+                .also { check(it.methodName == "run") { "should be named `run`" } }
+                .also { check(it.resolvedQualifiedName == RUN_FQN) { "name should be $RUN_FQN" } }
+                .arguments
+                .also { check(it.size == 1) { "run should have exactly one argument" } }
+                .single()
+                .let { checkNotNull(it as? Lambda) { "the single argument should be a lambda" } }
+                .statements
+                .let { parseStatements(it) }
                 .let { Passing(it) }
         }.recoverCatching {
             throw Exception("failed to parse ${Passing::class.qualifiedName}", it)
+        }
+
+        /**
+         * Recovers the step list from a `run { }` body's statements: every statement but the last
+         * must be a named `val` binding, and the trailing statement must be a bare reference to the
+         * last binding's name (design.md §2.7's normal form — see [generate]).
+         */
+        private fun parseStatements(statements: List<Stmt>): List<ActionLayout> {
+            check(statements.isNotEmpty()) { "run block should not be empty" }
+            val valStatements = statements.dropLast(1).map { statement ->
+                checkNotNull(statement as? ValStmt) { "expected a val binding, got `${statement.sourceText}`" }
+            }
+            val trailing =
+                checkNotNull(statements.last() as? ExprStmt) { "expected a trailing expression" }
+            val lastStepName = checkNotNull(valStatements.lastOrNull()?.name) {
+                "run block should declare at least one step"
+            }
+            check((trailing.expr as? Reference)?.resolvedName == lastStepName) {
+                "trailing expression should reference the last step (`$lastStepName`)"
+            }
+            return valStatements.map { valStatement ->
+                checkNotNull(ActionLayout.parse(valStatement.initializer).getOrThrow()) {
+                    "failed to convert `${valStatement.sourceText}` to an ActionLayout"
+                }
+            }
         }
     }
 }
