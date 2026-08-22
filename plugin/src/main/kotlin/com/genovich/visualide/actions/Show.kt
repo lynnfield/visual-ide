@@ -12,9 +12,10 @@ import com.genovich.visualide.analysis.QualifiedCall
  * still to validate, not yet supported) — the sole implementation of [ActionDefinition.PortDefault].
  *
  * Not an [ActionLayout.ExpressionParser]: `Show` binds a *dependency-plane* default-parameter
- * value, not a function-body node, so it has no place in [ActionLayout.parse]'s dispatcher. This
- * is scaffolding for a future `parseAssembly` (rung 2 step 1's still-open stretch goal, see
- * `docs/example-rung2.md`) — nothing calls [parse] yet.
+ * value, not a function-body node, so it has no place in [ActionLayout.parse]'s dispatcher.
+ * [ActionDefinition.parseAssembly] (design.md §2.8's dependency-plane round-trip) calls [parse]
+ * for each assembly parameter with a default expression, to tell a `Show`-defaulted T-function
+ * port apart from a required one.
  */
 object Show : ActionDefinition.PortDefault {
     const val SHOW_FQN = "com.genovich.components.Show"

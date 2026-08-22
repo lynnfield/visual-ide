@@ -47,6 +47,28 @@ object KotlinAnalysis {
             ?.evaluate() as? String,
     )
 
+    /**
+     * `UAST → `[FunctionInfo] for a top-level function, e.g. `<Name>Assembly` (design.md §2.8).
+     * Kotlin surfaces a top-level function's UAST node as a [UMethod] of a synthetic
+     * `<FileName>Kt` facade class, not directly off `UFile` — callers reach [uMethod] via
+     * `uFile.classes.first().methods.first()`.
+     */
+    fun parseFunction(uMethod: UMethod): FunctionInfo = FunctionInfo(
+        name = uMethod.name,
+        parameters = uMethod.uastParameters.map { parameter ->
+            FunctionInfo.Parameter(
+                name = parameter.name,
+                defaultValue = parameter.uastInitializer?.let { toExpr(it) },
+            )
+        },
+        bodyExpression = uMethod.uastBody
+            .asSafely<UBlockExpression>()
+            ?.expressions
+            ?.firstIsInstanceOrNull<UReturnExpression>()
+            ?.returnExpression
+            ?.let { toExpr(it) },
+    )
+
     fun toExpr(expression: UExpression): Expr {
         val sourceText = expression.asSourceString()
         val resolved = expression.tryResolveNamed()

@@ -12,7 +12,7 @@ architecture and what "done" means for the earlier rungs.
   type-checks (H2). Green.
 - **Rung 2 / Step 1 (done)** — assembly file generation (`ActionDefinition.generateAssembly()`);
   `save()` emits both `<Name>.kt` and `<Name>Assembly.kt`. Validates the *wiring* half of H3. See
-  `docs/example-rung2.md`. `parseAssembly` (the round-trip stretch goal) is still open.
+  `docs/example-rung2.md`. `parseAssembly` (the round-trip stretch goal) is now closed — see Step 6.
 - **Rung 2 / Step 2 (done)** — T-function ports, attached via `ActionDefinition.portDefaults` (a
   definition-level `Map<String, PortDefault>`, not a leaf-node flag or type — see
   `docs/example-rung3.md` for why), and the derived `<Name>UiStateFlow` projection
@@ -25,6 +25,20 @@ architecture and what "done" means for the earlier rungs.
   `parse` and compared against the source's stored value to flag `ActionDefinition.isDrifted` when
   the body was hand-edited out of band. `layout` stays an unimplemented stub. See
   `docs/example-rung4.md`. Validates H4. Drift is detected but not yet surfaced in the UI.
+- **Rung 4 (done)** — engine IR / `KotlinAnalysis` UAST-adapter boundary interposed; node parsers
+  consume `analysis.Expr`, never UAST directly. See `docs/example-rung5.md`. Validates H5.
+- **Rung 5 (done)** — named SSA `val`s (`Passing` reworked from a `.let{}` chain), `Ref`/`Tuple`
+  value-plumbing nodes, `Branch` over a sealed type, and the full `GuessGame` specimen. See
+  `docs/example-rung6.md`. Validates H6, completes H7.
+- **Step 6 (done)** — `parseAssembly`, closing rung 2 / step 1's stretch goal (design.md §2.8's
+  dependency-plane round-trip): a new `FunctionInfo` IR shape for top-level functions plus
+  `KotlinAnalysis.parseFunction` and `ActionDefinition.parseAssembly` recover `portDefaults` (which
+  ports are T-functions) from a parsed `<Name>Assembly.kt`, wired into the tool window's file scan
+  so reopening a project no longer forgets T-function attachment. See `docs/example-rung7.md`. Not
+  a new rung on the §6 ladder (that ladder ended at rung 5) — scoped to exactly what
+  `generateAssembly` already emits (required ports + `Show`-defaulted ports), not design.md §2.8's
+  fuller grammar (child-assembly wiring, decorators, shared singletons), which `generateAssembly`
+  doesn't produce yet either.
 
 The engine lives in `plugin/src/main/kotlin/com/genovich/visualide/actions/`:
 `ActionLayout` (node interface: `Render` / `generate` / `inferType` / `parse`), the nodes
@@ -244,10 +258,50 @@ and completes H7.
 
 ---
 
+## Step 6 — Assembly parsing / dependency-plane round-trip (`parseAssembly`, closes Step 1's stretch goal) — done
+
+**Goal.** Recover `ActionDefinition.portDefaults` (which ports are T-functions) from a parsed
+`<Name>Assembly.kt`, so reopening a project doesn't forget T-function attachment — until now the
+only way that map got populated was the in-session `Render()` checkbox.
+
+**Note (as implemented).** Scoped to exactly what `generateAssembly` already emits — a required
+parameter vs. one defaulted to `Show(uiStateFlow.<port>Flow)` — not design.md §2.8's fuller
+dependency-plane grammar (child-`*Assembly(...)` wiring, decorators, shared singletons), since
+`generateAssembly` doesn't produce those yet either. A new engine-IR shape, `FunctionInfo`
+(`name`, `parameters: List<Parameter>` with `name`/`defaultValue: Expr?`, `bodyExpression: Expr?`),
+was needed because every prior parser matched an expression inside a class's `invoke()` body,
+never a top-level function; `KotlinAnalysis.parseFunction(uMethod: UMethod)` builds one, reusing
+`parseClass`'s body-extraction logic. One UAST quirk confirmed by running, not assumed: Kotlin
+surfaces a top-level function's UAST node as a `UMethod` of a synthetic `<FileName>Kt` facade
+`UClass`, not directly off `UFile` (`ShowTest` had already hit this reaching a parameter's default
+value). `ActionDefinition.parseAssembly(functionInfo, definition)` checks the function is named
+`<Name>Assembly` and its body is a `Call` resolving to `definition`'s own class, then recovers a
+`Show`-defaulted port per matching parameter name. Wired into
+`VisualIdeToolWindowFactory`'s file-scan via a new `withRecoveredPortDefaults` merge step. See
+`docs/example-rung7.md` for full detail, including the resolution-scope bug the first pass hit
+(the constructor call didn't resolve at all without the class file in the parse fixture).
+
+**Tasks.**
+- New `analysis/FunctionInfo.kt` (+ `Parameter`) IR shape for a top-level function's signature and
+  single-expression body.
+- `KotlinAnalysis.parseFunction(uMethod: UMethod): FunctionInfo`.
+- `ActionDefinition.parseAssembly(functionInfo, definition): ActionDefinition?` in the companion
+  object, calling `Show.parse` per defaulted parameter.
+- Wire the recovery into `VisualIdeToolWindowFactory`'s file-scan `LaunchedEffect`.
+
+**Tests.** `GuessLoopParseAssemblyTest`: recovers a `Show`-defaulted port, round-trips the
+no-T-function-ports case, and rejects a function that isn't the definition's own assembly.
+
+**Acceptance.** A definition reparsed from its `<Name>.kt` + `<Name>Assembly.kt` pair recovers the
+same `portDefaults` it was generated from. Closes the dependency-plane round-trip stretch goal
+design.md §2.8 and `docs/example-rung2.md` left open.
+
+---
+
 ## Cross-cutting risks / notes
 
-- **Parsing top-level assembly functions** (Step 1 stretch) and **`when`/sealed** (Step 5) need new
-  UAST handling beyond the current expression parsers — budget for it.
+- **Parsing top-level assembly functions** (Step 1 stretch, closed by Step 6) and **`when`/sealed**
+  (Step 5) needed new UAST handling beyond the current expression parsers.
 - **`checkHighlighting`** can be sensitive to fixture setup; keep the stub minimal-but-valid and
   attach stdlib. Suspend calls inside `repeatWhileActive`/`Show` require those stubs to be
   `suspend inline`.

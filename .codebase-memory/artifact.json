@@ -1,11 +1,11 @@
 {
     "schema_version": 1,
-    "commit": "96e22095668e37defbaffdaf98e2a6217ee7fc10",
-    "indexed_at": "2026-08-21T16:01:25Z",
+    "commit": "a5a0276fc8d198f3c73872c1fb09e69ce34b36a4",
+    "indexed_at": "2026-08-22T09:57:16Z",
     "project": "Users-genovich-AndroidStudioProjects-VisualIDE",
-    "nodes": 846,
-    "edges": 2013,
-    "original_size": 3997696,
-    "compressed_size": 431320,
+    "nodes": 876,
+    "edges": 2010,
+    "original_size": 4128768,
+    "compressed_size": 462390,
     "compression_level": 3
 }

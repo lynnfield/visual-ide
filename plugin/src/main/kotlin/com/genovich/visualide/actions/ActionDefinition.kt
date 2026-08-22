@@ -10,7 +10,9 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import com.genovich.visualide.analysis.Call
 import com.genovich.visualide.analysis.ClassInfo
+import com.genovich.visualide.analysis.FunctionInfo
 import com.genovich.visualide.types.TYPE_NOTHING
 import com.genovich.visualide.ui.AddNewLayoutButton
 import com.genovich.visualide.ui.TextBlock
@@ -321,6 +323,39 @@ data class ActionDefinition(
                         )
                     }
                 }
+
+        /**
+         * Recovers [portDefaults] from [definition]'s already-parsed `<Name>Assembly.kt`
+         * (design.md §2.8, the dependency-plane round-trip) — the only place T-function attachment
+         * survives once a project is reopened, since the function file's body tree stays 100%
+         * unaware of T-functions (see [portDefaults]'s KDoc). Mirrors exactly what
+         * [generateAssembly] emits today — a required parameter vs. one defaulted to
+         * `Show(uiStateFlow.<port>Flow)` — not the fuller dependency-plane grammar (child-assembly
+         * wiring, decorators, shared singletons) design.md §2.8 describes, since [generateAssembly]
+         * doesn't produce those yet either (`docs/example-rung2.md`'s "Limitations").
+         *
+         * Returns null if [functionInfo] doesn't look like [definition]'s own assembly (wrong
+         * name, or a body that isn't a call constructing [definition]'s own class) — best-effort,
+         * matching every other parser in this package. A parameter whose name isn't one of
+         * [definition]'s ports (e.g. `uiStateFlow` itself) is silently skipped rather than failing
+         * the whole parse.
+         */
+        fun parseAssembly(functionInfo: FunctionInfo, definition: ActionDefinition): ActionDefinition? {
+            if (functionInfo.name != "${definition.name.value}$ASSEMBLY_SUFFIX") return null
+            val body = functionInfo.bodyExpression as? Call ?: return null
+            if (body.resolvedName != definition.name.value) return null
+
+            val ports = definition.signature().ports.keys
+            val recoveredDefaults = functionInfo.parameters
+                .mapNotNull { parameter ->
+                    val portName = parameter.name?.takeIf { it in ports } ?: return@mapNotNull null
+                    val default = parameter.defaultValue ?: return@mapNotNull null
+                    Show.parse(default).getOrNull()?.let { portName to Show }
+                }
+                .toMap()
+
+            return definition.copy(portDefaults = mutableStateOf(recoveredDefaults))
+        }
 
         /** SHA-256 of [bodyCode], the checksum stored in `@Diagram` and checked for drift on [parse]. */
         private fun checksumOf(bodyCode: String): String {
