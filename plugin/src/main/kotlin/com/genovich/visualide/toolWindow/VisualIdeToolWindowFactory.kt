@@ -19,6 +19,7 @@ import com.intellij.openapi.fileEditor.FileEditorManagerListener
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.guessProjectDir
+import com.intellij.openapi.vfs.VirtualFile
 import com.intellij.openapi.vfs.findDirectory
 import com.intellij.openapi.wm.ToolWindow
 import com.intellij.openapi.wm.ToolWindowFactory
@@ -67,6 +68,7 @@ class VisualIdeToolWindowFactory : ToolWindowFactory, DumbAware {
                         ?.classes
                         .orEmpty()
                         .mapNotNull { ActionDefinition.parse(KotlinAnalysis.parseClass(it)) }
+                        .map { definition -> withRecoveredPortDefaults(definition, currentFile, project) }
                 }
 
                 actions.clear()
@@ -82,6 +84,34 @@ class VisualIdeToolWindowFactory : ToolWindowFactory, DumbAware {
             )
         }
     }
+}
+
+/**
+ * design.md §2.8's dependency-plane round-trip: looks for [definition]'s sibling
+ * `<Name>Assembly.kt` next to [definitionFile] and recovers its T-function port attachment
+ * ([ActionDefinition.parseAssembly]) — otherwise a reopened project would show every port as a
+ * plain required dependency, forgetting which ones were marked as T-functions. Returns
+ * [definition] unchanged if there's no sibling assembly file, or it doesn't parse (best-effort,
+ * matching every other parser in this package).
+ */
+private fun withRecoveredPortDefaults(
+    definition: ActionDefinition,
+    definitionFile: VirtualFile?,
+    project: Project,
+): ActionDefinition {
+    val functionInfo = definitionFile
+        ?.parent
+        ?.findChild("${definition.name.value}${ActionDefinition.ASSEMBLY_SUFFIX}.kt")
+        ?.toPsiFile(project)
+        ?.toUElementOfType<UFile>()
+        ?.classes
+        ?.firstOrNull()
+        ?.methods
+        ?.firstOrNull()
+        ?.let { KotlinAnalysis.parseFunction(it) }
+        ?: return definition
+
+    return ActionDefinition.parseAssembly(functionInfo, definition) ?: definition
 }
 
 private fun save(actionDefinition: ActionDefinition, project: Project) {

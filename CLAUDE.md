@@ -43,8 +43,23 @@ question — before grepping or reading files blind:
   per-port structural type inference, validating H2 (the generated code type-checks, not just
   parses). Documents the `inferType` scheme per node type and its known limitations (no
   unification across repeated port names).
+- **`docs/example-rung2.md`** — rung 2 / step 1: assembly file generation
+  (`ActionDefinition.generateAssembly()`), the wiring half of H3.
+- **`docs/example-rung3.md`** — rung 2 / step 2: T-function ports (`Show`) and the derived
+  `<Name>UiStateFlow` projection, the projection half of H3, plus H7.
+- **`docs/example-rung4.md`** — rung 2 / step 3: `@Node`/`@Diagram(checksum)` annotations and
+  drift detection, validating H4.
+- **`docs/example-rung5.md`** — rung 4: the engine IR / `KotlinAnalysis` UAST-adapter boundary,
+  validating H5 (no `org.jetbrains.uast` imports left in the node parsers).
+- **`docs/example-rung6.md`** — rung 5: named SSA `val`s replacing `Passing`'s `.let{}` pipe
+  (the predicted H6 break), `Tuple`/`Ref` value-plumbing nodes, `Branch` over a sealed type, and
+  the full `GuessGame` specimen (H6, completes H7).
+- **`docs/example-rung7.md`** — not a new §6 rung (the ladder ended at rung 5); closes rung 2 /
+  step 1's `parseAssembly` stretch goal (design.md §2.8's dependency-plane round-trip): a new
+  `FunctionInfo` IR shape for top-level functions, `KotlinAnalysis.parseFunction`, and
+  `ActionDefinition.parseAssembly` recover `portDefaults` from a parsed `<Name>Assembly.kt`.
 
-These two example docs are progress logs for the rung ladder in `docs/design.md` §6 — see
+These example docs are progress logs for the rung ladder in `docs/design.md` §6 — see
 "Implementation status" below for what's done vs. still open. When a new rung is completed, add a
 matching `docs/example-rungN.md` following the same structure (what was added, expected generated
 code, files changed, verification notes, limitations feeding back into §6).
@@ -114,10 +129,24 @@ types, each of which is simultaneously:
 Current node types, each in its own file:
 
 - `Action` — a leaf port call (`` `name`(input) ``).
-- `Passing` — a linear pipeline (`.let { }` chain); models the Sequence operator.
-- `RepeatWhileActive` — an infinite loop (`repeatWhileActive { }`); returns `Nothing`.
+- `Passing` — a linear pipeline of named SSA `val`s wrapped in `run { }` (reworked in rung 5 from
+  a `.let { }` chain, confirming the predicted H6 break); models the Sequence operator.
+- `Ref` — names/re-reads a value already in scope (needed under `Tuple` to recover an earlier
+  value after a later step consumes it).
+- `Tuple` — pairs two in-scope values via the dot-call `a.to(b)` form (not the infix `a to b`
+  operator, so it stays a resolvable qualified call).
+- `Branch` — n-way dispatch over a named sealed type; generates an exhaustive `when` with a
+  required trailing `else -> TODO(...)` arm (structural type inference only mints opaque type
+  variables, so Kotlin can't prove exhaustiveness itself).
+- `RepeatWhileActive` — an infinite loop (`repeatWhileActive { }`); returns `Nothing`. No
+  break/return primitive yet, so a `Branch` case can't actually exit the loop (see design.md
+  §1.4's unimplemented `updateLoop`).
 - `RetryUntilResult` — a decorator that retries its body until it returns without throwing.
 - `TodoStub` — placeholder generated/rendered when a slot is empty.
+
+Of design.md §2.5's full value-plumbing palette, only `Tuple` and `Ref` are implemented;
+`Construct`/`Copy`/`Project`/`Select`/`Guard`/`Not` are not — each is an independent, bounded
+follow-up in the same shape as the existing nodes.
 
 `ActionLayout.parse` (the dispatcher in `ActionLayout.kt`) races all node parsers concurrently
 against a UAST expression and requires **exactly one** to succeed — zero or multiple matches are
@@ -142,10 +171,27 @@ with `Show` (`actions/Show.kt`) as its only implementation today — `com.genovi
 is the only recognized T-function binding, matched by `Show.parse`, a standalone recognizer,
 **not** an `ActionLayout.UExpressionParser` and not registered in `ActionLayout.parse`'s
 dispatcher, since `Show` marks a *dependency-plane* (assembly) default value, not a function-body
-node. Nothing calls `Show.parse` yet; it's scaffolding for a future `parseAssembly`. Whether
-T-function recognition should be customizable (a registry, not one hardcoded FQN) or support
-multiple T-function *kinds* is an open hypothesis — see design.md §5.1's "Open question" note —
-not implemented.
+node. `ActionDefinition.parseAssembly` (design.md §2.8, `docs/example-rung7.md`) calls `Show.parse`
+per assembly parameter with a default expression, to recover `portDefaults` when a project is
+reopened — see "Dependency-plane round-trip" below. Whether T-function recognition should be
+customizable (a registry, not one hardcoded FQN) or support multiple T-function *kinds* is an open
+hypothesis — see design.md §5.1's "Open question" note — not implemented.
+
+### Dependency-plane round-trip (`ActionDefinition.parseAssembly`)
+
+`portDefaults` (which ports are T-functions) lives only at the definition level, never in the body
+tree — so re-parsing `<Name>.kt` alone always yields `portDefaults = emptyMap()`.
+`ActionDefinition.parseAssembly(functionInfo, definition)` recovers it from a parsed
+`<Name>Assembly.kt`: `KotlinAnalysis.parseFunction(uMethod: UMethod): FunctionInfo` is the IR
+adapter for a **top-level function** (a shape no prior parser needed, since every node parser
+matches an expression inside a class's `invoke()` body) — note Kotlin surfaces a top-level
+function's UAST node as a `UMethod` of a synthetic `<FileName>Kt` facade `UClass`, not directly off
+`UFile`. `parseAssembly` is scoped to exactly what `generateAssembly` emits today (a required
+parameter vs. a `Show`-defaulted one), not design.md §2.8's fuller dependency-plane grammar
+(child-assembly wiring, decorators, shared singletons), which `generateAssembly` doesn't produce
+yet either. `VisualIdeToolWindowFactory`'s file-scan calls it via `withRecoveredPortDefaults` to
+merge recovered T-function attachment into a freshly reparsed definition. See
+`docs/example-rung7.md`.
 
 ### Round-trip contract
 
@@ -162,23 +208,49 @@ in lockstep, and vice versa — they are two halves of one contract, verified by
 - **Rung 1 (done)** — real per-port type inference (H2): each port gets its own inferred
   `Action<In, Out>` type via `inferType`, and the generated code actually type-checks.
 - **Rung 2 / Step 1 (done)** — assembly file generation (`ActionDefinition.generateAssembly()`),
-  the wiring half of H3. See `docs/example-rung2.md`. `parseAssembly` (dependency-plane round-trip)
-  is still open.
+  the wiring half of H3. See `docs/example-rung2.md`. `parseAssembly` (dependency-plane
+  round-trip) is now done too — see "Dependency-plane round-trip" above and `docs/example-rung7.md`.
 - **Rung 2 / Step 2 (done)** — T-function ports (`ActionDefinition.portDefaults`, recognized via
   `com.genovich.components.Show` — see "T-function recognition" above) and the derived
   `<Name>UiStateFlow` projection (`ActionDefinition.generateUiStateFlow()`), the projection half of
   H3, plus H7. See `docs/example-rung3.md`.
-- **Not yet implemented**: `@Node`/`@Diagram` annotations and checksums, the engine IR /
-  `KotlinAnalysis` host-abstraction boundary, value-plumbing nodes
-  (Tuple/Construct/Copy/Project/Select/Guard/Not), Branch, and Parallel. See
-  `docs/implementation-plan.md` (Steps 3–5) and `docs/design.md` §6.3–6.4 for the planned order.
+- **Rung 2 / Step 3 (done)** — `@Node`/`@Diagram(checksum)` emitted on every generated class;
+  drift detection (`ActionDefinition.isDrifted`) recomputes the checksum on parse and flags
+  hand-edited bodies, though it isn't surfaced in any UI yet. `layout` stays an unimplemented
+  stub. Validates H4. See `docs/example-rung4.md`.
+- **Rung 4 (done)** — the engine IR / `KotlinAnalysis` UAST-adapter boundary (D12) is interposed;
+  node parsers consume the IR (`com.genovich.visualide.analysis`), not raw UAST. Validates H5.
+  See `docs/example-rung5.md`.
+- **Rung 5 (done)** — named SSA `val`s (the predicted H6 break), `Tuple`/`Ref` value-plumbing
+  nodes, `Branch` over a sealed type, and the full `GuessGame` specimen (two T-functions)
+  round-trip and type-check. Validates H6, completes H7. See `docs/example-rung6.md`.
+- **Known gaps, called out explicitly in the rung docs (not silently missing)**:
+  - Loop exit isn't implemented — `repeatWhileActive` has no break/return, so `Branch` can't
+    actually terminate a loop (design.md §1.4's `updateLoop` is a separate, unbuilt primitive).
+  - Optional Parallel rung (D13, timeout-racing node) never attempted.
+  - `Construct`/`Copy`/`Project`/`Select`/`Guard`/`Not` value-plumbing nodes not built (only
+    `Tuple`+`Ref` landed — sufficient for the rung 5 target).
+  - `parseAssembly` only round-trips what `generateAssembly` emits (required + `Show`-defaulted
+    ports) — design.md §2.8's fuller grammar (child-assembly wiring, decorators, shared
+    singletons) is generated by neither side yet.
+  - Drift detection has no UI surface, and doesn't cover the assembly file (only the function
+    file's body has a checksum).
+  - Customizable/multi-kind T-function recognition (design.md §5.1) is still a hardcoded FQN.
+  - See `docs/implementation-plan.md` for the full step-by-step history and
+    `docs/design.md` §6.3–6.4 for the ladder these rungs climbed.
 
-### UAST, not raw PSI
+### Engine IR / `KotlinAnalysis` boundary, not raw UAST
 
-Parsing goes through UAST (`org.jetbrains.uast`), not raw PSI directly — this is intentional
-groundwork for the `KotlinAnalysis` host-abstraction boundary (`docs/design.md` §4.5, D12), which
-is meant to keep the engine portable beyond IntelliJ eventually. Don't reach for raw PSI APIs in
-node parsers unless UAST genuinely can't express what's needed.
+Node parsers consume the engine's own IR (`com.genovich.visualide.analysis`: a sealed `Expr` with
+call/qualified-call/lambda/reference shapes, plus `WhenExpr`/`WhenCase` for `Branch` and a
+`ClassInfo` for the `ActionDefinition.parse` entry point), not `org.jetbrains.uast` directly —
+`KotlinAnalysis` (`parseClass`/`toExpr`) is the sole UAST↔IR adapter, interposed in rung 4 to keep
+the engine portable beyond IntelliJ (`docs/design.md` §4.5, D12). Resolution
+(`resolvedName`/`resolvedQualifiedName`) is computed eagerly by the adapter and carried as a field
+on every `Expr` variant. Don't import `org.jetbrains.uast` in a node's `parse` — extend the IR
+instead if it can't express the new shape. Two platform utilities intentionally stayed out of the
+IR as out-of-scope (`runBlockingCancellable`, `getOrLogException`) since neither carries
+UAST/PSI types across the boundary.
 
 ### Tests
 
