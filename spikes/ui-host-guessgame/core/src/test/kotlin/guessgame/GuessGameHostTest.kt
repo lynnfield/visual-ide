@@ -17,7 +17,7 @@ class GuessGameHostTest {
 
     @Test
     fun `a guess is compared and the result shown`() = runTest {
-        val host = UiHost()
+        val host = UiHost(GuessGameScope)
         val game = launch { GuessGameAssembly(host)(42) }
 
         host.awaitRequest(askGuess).answer(10)
@@ -32,7 +32,7 @@ class GuessGameHostTest {
 
     @Test
     fun `giving up reveals the secret`() = runTest {
-        val host = UiHost()
+        val host = UiHost(GuessGameScope)
         val game = launch { GuessGameAssembly(host)(42) }
 
         host.awaitRequest(giveUp).answer(Unit)
@@ -43,7 +43,7 @@ class GuessGameHostTest {
 
     @Test
     fun `answering one parallel sibling withdraws the other`() = runTest {
-        val host = UiHost()
+        val host = UiHost(GuessGameScope)
         val game = launch { GuessGameAssembly(host)(42) }
 
         host.awaitRequest(giveUp)
@@ -61,7 +61,7 @@ class GuessGameHostTest {
             override fun guessing(askGuess: Request<Unit, Int>, giveUp: Request<Unit, Unit>) = "guessing"
             override fun result(showResult: Request<Outcome, Unit>) = "result"
         }
-        val host = UiHost()
+        val host = UiHost(GuessGameScope)
         val game = launch { GuessGameAssembly(host)(42) }
 
         assertEquals("guessing", names.render(host.live.first { names.render(it) != null }))

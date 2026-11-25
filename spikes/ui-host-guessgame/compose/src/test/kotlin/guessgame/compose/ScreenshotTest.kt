@@ -4,6 +4,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.ui.ImageComposeScene
 import androidx.compose.ui.unit.Density
 import guessgame.GuessGameAssembly
+import guessgame.GuessGameScope
 import guessgame.GuessGamePorts.askGuess
 import guessgame.GuessGamePorts.giveUp
 import guessgame.GuessGamePorts.showResult
@@ -21,7 +22,7 @@ class ScreenshotTest {
 
     @Test
     fun `play a round and capture each screen`() = runBlocking {
-        val host = UiHost()
+        val host = UiHost(GuessGameScope)
         val game = launch(Dispatchers.Default) { GuessGameAssembly(host)(42) }
         val scene = ImageComposeScene(840, 640, Density(2f)) { MaterialTheme { GuessGameUi(host) } }
         var frame = 0L

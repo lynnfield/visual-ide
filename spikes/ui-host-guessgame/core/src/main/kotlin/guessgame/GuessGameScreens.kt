@@ -4,6 +4,8 @@ import com.genovich.components.Action
 import uihost.Live
 import uihost.Port
 import uihost.Request
+import uihost.ScopeKey
+import uihost.Screens
 import uihost.UiHost
 
 // ---------------------------------------------------------------------------------------------
@@ -43,6 +45,19 @@ fun <R> GuessGameScreens<R>.render(live: Live): R? = when {
         result(live[GuessGamePorts.showResult])
     else -> null
 }
+
+/**
+ * Generated scope key: a parent that opens GuessGame as a feature only needs this, never
+ * [GuessGameScreens]. The cast below is safe because [register] is the only way in.
+ */
+object GuessGameScope : ScopeKey("guessGame") {
+    @Suppress("UNCHECKED_CAST")
+    override fun <R> render(screens: Screens<R>, host: UiHost): R? =
+        (screens.implementationFor(this) as GuessGameScreens<R>).render(host.live.value)
+}
+
+/** Generated typed registration: the client's `R` must match the registry's `R`. */
+fun <R> Screens<R>.register(key: GuessGameScope, screens: GuessGameScreens<R>) = registerUnchecked(key, screens)
 
 /** Generated assembly: every T-function port defaults to the host. */
 fun GuessGameAssembly(

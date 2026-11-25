@@ -40,7 +40,7 @@ class BotClientTest {
     @Test
     fun `bot finds any secret in at most 7 guesses`() = runTest {
         for (secret in 1..100) {
-            val host = UiHost()
+            val host = UiHost(GuessGameScope)
             val bot = BinarySearchBot()
             val game = launch { GuessGameAssembly(host)(secret) }
             while (!bot.won) {

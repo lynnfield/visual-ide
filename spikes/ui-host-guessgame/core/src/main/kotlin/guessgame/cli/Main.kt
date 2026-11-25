@@ -8,6 +8,7 @@ import guessgame.Outcome
 import guessgame.TooHigh
 import guessgame.TooLow
 import guessgame.render
+import guessgame.GuessGameScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
@@ -43,7 +44,7 @@ object ConsoleScreens : GuessGameScreens<Prompt> {
 }
 
 fun main(): Unit = runBlocking {
-    val host = UiHost()
+    val host = UiHost(GuessGameScope)
     launch { GuessGameAssembly(host)(Random.nextInt(1, 101)) }
     while (true) {
         val prompt = host.live.first { ConsoleScreens.render(it) != null }.let { ConsoleScreens.render(it)!! }

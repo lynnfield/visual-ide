@@ -50,13 +50,54 @@ mentions flows, and none of it is per-node merge logic; the merge rule lives onc
 
 ## Limitations found
 
-- **Requests are keyed by port.** Two live calls of the same port (a list of items, a feature
-  opened twice) would collide. Needs the call-site path in the key, the same key the state
-  restoration brainstorm wants.
+- **Requests are keyed by port within one host.** Nested scopes (below) separate features; a list
+  of items would still need one child scope per item key.
 - **Brief gaps between screens.** After a guess is answered, `giveUp` is still waiting for a moment
   before `parallel` cancels it, so no screen matches; clients keep the last screen (`mapNotNull`
   in Compose). Same issue as today's `collectLastNonNull`, handled once in the client root.
-- **Scopes and Back are not in this spike.** GuessGame has no on-demand feature; JetNews is the
-  test for "a scope covers its siblings" and Back-to-close.
+- **The Compose root redraws from the top on any change** (new lambdas every time). Fine at this
+  size; a real client would render per scope so unchanged scopes skip.
 - **Grouping is hand-written here** as the would-be generated output. visual-ide would derive it
   from the diagram (parallel siblings → one screen).
+
+## Nested scopes with typed keys (`arcade/`, `player/`)
+
+The host is now a tree: one `UiHost` per scope. `UiHost.scope(key) { child -> ... }` attaches a child
+for exactly as long as the feature runs. Only scope operators open children:
+`onDemandFeature(host, open, close, key) { child -> ... }` and `scoped(host, key) { child -> ... }`.
+
+The example is a small root, **Arcade**: a lobby that opens **GuessGame** as an on-demand feature
+(placement `Cover`), and a **Player** mini-bar running in parallel the whole time (placement
+`Beside`). Neither the Arcade, GuessGame nor Player logic knows about hosts.
+
+```text
+arcade host        openGame | closeGame
+├─ guessGame host  askGuess, giveUp | showResult      (Cover: exists only while the game is open)
+└─ player host     toggle                               (Beside: always there)
+```
+
+How a child scope gets its screens, **typed keys**:
+
+- Each feature generates a `ScopeKey` next to its screens interface (`GuessGameScope`, `PlayerScope`)
+  plus a typed `Screens<R>.register(key, impl: XScreens<R>)`.
+- The client registers every scope's screens once:
+  `register(ArcadeScope, ArcadeComposeScreens); register(GuessGameScope, ComposeScreens); ...`.
+  A dynamically loaded feature would register its own when it arrives.
+- The parent's generated dispatch only names the child's **key**. It gets the child already drawn as
+  `R`: `game(game: R, closeGame, player: R?)`. Arcade never mentions `GuessGameScreens`.
+- The only runtime failure is a missing registration, reported by scope name
+  (`No screens registered for scope 'arcade'`).
+
+Placement:
+
+- `Cover` (GuessGame): the parent has a screen method that replaces its siblings. `root.back()`
+  answers the close request of the deepest open `Cover` scope; in the desktop app, Escape calls it.
+- `Beside` (Player): an optional `player: R?` slot in every parent screen it can sit next to.
+  Back skips it, so with only the lobby and player open, `back()` returns `false` (platform handles it).
+
+| Lobby + player | Game open, player playing | After Back |
+| --- | --- | --- |
+| ![](screenshots/arcade-1-lobby.png) | ![](screenshots/arcade-2-game-with-player.png) | ![](screenshots/arcade-3-after-back.png) |
+
+Tests: `core/src/test/kotlin/arcade/ArcadeHostTest.kt` (text client: covering, beside, Back, fresh
+scope on reopen, missing registration). `./gradlew :compose:run` now starts the Arcade.
